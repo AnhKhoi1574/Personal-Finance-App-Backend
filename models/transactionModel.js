@@ -41,7 +41,7 @@ const Transaction = mongoose.model('Transaction', transactionSchema);
 function validateTransaction(transaction) {
   const schema = Joi.object({
     date: Joi.date().required(),
-    type: Joi.string().required(),
+    type: Joi.string().valid('income', 'expense').required(),
     category: Joi.string().min(3).max(50).required(),
     transactionAmount: Joi.number().min(0).required(),
     description: Joi.string().min(3).max(50),
@@ -52,4 +52,4 @@ function validateTransaction(transaction) {
 // export
 exports.Transaction = Transaction;
 exports.transactionSchema = transactionSchema;
-exports.validate = validateTransaction;
+exports.validateTransaction = validateTransaction;
