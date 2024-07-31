@@ -45,4 +45,4 @@ function validateGoal(goal) {
 // export
 exports.Goal = Goal;
 exports.goalSchema = goalSchema;
-exports.validate = validateGoal;
+exports.validateGoal = validateGoal;
