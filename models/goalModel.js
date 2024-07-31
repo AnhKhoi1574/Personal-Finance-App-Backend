@@ -35,7 +35,7 @@ const Goal = mongoose.model('Goal', goalSchema);
 function validateGoal(goal) {
   const schema = Joi.object({
     category: Joi.string().min(3).max(50).required(),
-    dueDate: Joi.date().min(0).required(),
+    dueDate: Joi.date().required(),
     targetAmount: Joi.number().min(0).required(),
     currentAmount: Joi.number().min(0).required(),
   });
