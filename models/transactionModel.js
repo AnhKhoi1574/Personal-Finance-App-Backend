@@ -26,7 +26,7 @@ const transactionSchema = new mongoose.Schema({
     required: true,
     min: 0,
   },
-  description: {
+  title: {
     type: String,
     minlength: 3,
     maxlength: 50,
@@ -44,7 +44,7 @@ function validateTransaction(transaction) {
     type: Joi.string().valid('income', 'expense').required(),
     category: Joi.string().min(3).max(50).required(),
     transactionAmount: Joi.number().min(0).required(),
-    description: Joi.string().min(3).max(50),
+    title: Joi.string().min(3).max(50),
   });
   return Joi.validate(transaction);
 }
