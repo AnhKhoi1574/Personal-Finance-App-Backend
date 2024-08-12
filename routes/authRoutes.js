@@ -13,4 +13,6 @@ router
   .route('/login')
   .post(authController.login); 
 
+// Route for user homepage
+
 module.exports = router;

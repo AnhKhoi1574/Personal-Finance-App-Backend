@@ -5,6 +5,21 @@ const dotenv = require('dotenv');
 dotenv.config({ path: './config.env' });
 const app = require('./app');
 
+<<<<<<< Updated upstream
+=======
+require('./models/userModel');
+require('./models/promptModel');
+require('./models/transactionModel'); 
+require('./models/goalModel'); 
+// Hard-coded environment variables
+const DATABASE = 'mongodb+srv://team7:1234@cluster0.qayvklq.mongodb.net/';
+const DATABASE_PASSWORD = '1234';
+const PORT = 3000;
+
+// Replace placeholder with actual password
+const DB = DATABASE.replace('1234', DATABASE_PASSWORD);
+
+>>>>>>> Stashed changes
 // Connect to MongoDB
 const DB = process.env.DATABASE.replace(
   '1234',

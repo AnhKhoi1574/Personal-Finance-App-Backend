@@ -1,4 +1,3 @@
-// import
 const Joi = require('joi');
 const mongoose = require('mongoose');
 
@@ -34,10 +33,9 @@ function validatePrompt(prompt) {
     content: Joi.string().min(3).max(250).required(),
     createdDate: Joi.date(),
   });
-  return Joi.validate(prompt);
+  return schema.validate(prompt);
 }
 
-// export
+// Export
 exports.Prompt = Prompt;
-exports.promptSchema = promptSchema;
 exports.validatePrompt = validatePrompt;
