@@ -99,6 +99,10 @@ exports.protect = async (req, res, next) => {
     token = req.headers.authorization.split(' ')[1];
   }
 
+  if (!token && req.cookies) {
+    token = req.cookies.jwt;
+  }
+
   if (!token) {
     return res.status(401).json({
       status: 'fail',

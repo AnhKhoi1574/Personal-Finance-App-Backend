@@ -19,7 +19,7 @@ exports.createTransaction = async (req, res) => {
     }
 
     // Find the user by ID
-    const user = await User.findById(req.params.id);
+    const user = await User.findById(req.user._id);
     if (!user) {
       return res
         .status(404)
@@ -62,7 +62,7 @@ exports.createTransaction = async (req, res) => {
 exports.getAllTransactions = async (req, res) => {
   try {
     // Find the user by ID
-    const user = await User.findById(req.params.id);
+    const user = await User.findById(req.user._id);
 
     // Check if the user exists
     if (!user) {
@@ -94,7 +94,7 @@ exports.getAllTransactions = async (req, res) => {
 // Get a single transaction
 exports.getTransaction = async (req, res) => {
   try {
-    const userId = req.params.id;
+    const userId = req.user._id;
     const transactionId = req.params.transactionId;
 
     // Find the user by ID
@@ -134,7 +134,7 @@ exports.getTransaction = async (req, res) => {
 // Update transaction
 exports.updateTransaction = async (req, res) => {
   try {
-    const userId = req.params.id;
+    const userId = req.user._id;
     const transactionId = req.params.transactionId;
     const { date, type, category, transactionAmount, title } = req.body;
 
