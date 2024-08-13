@@ -11,7 +11,7 @@ router
 
 // Route for getting, updating, and deleting a specific budget by ID
 router
-    .route('/budget/:id')
+    .route(':id/budget')
     .get(budgetController.getSpecificBudget) 
     .put(budgetController.updateBudget) 
     .delete(budgetController.deleteBudget); 

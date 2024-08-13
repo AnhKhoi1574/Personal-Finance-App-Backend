@@ -1,3 +1,4 @@
+//Require model
 require('./models/userModel');
 require('./models/promptModel');
 require('./models/transactionModel'); 

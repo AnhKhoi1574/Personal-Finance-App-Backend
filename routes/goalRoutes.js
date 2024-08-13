@@ -11,7 +11,7 @@ router
 
 // Route for getting, updating, and deleting a specific goal by ID
 router
-  .route('/goal/:id')
+  .route(':id/goal/')
   .get(goalController.getSpecificGoal) 
   .put(goalController.updateGoal) 
   .delete(goalController.deleteGoal); 
