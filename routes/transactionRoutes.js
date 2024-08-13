@@ -9,9 +9,10 @@ router
   .post(transactionController.createTransaction)
   .get(transactionController.getAllTransactions);
 
-// Route for updating and deleting a specific transaction by ID
+// Route for getting, updating and deleting a specific transaction by ID
 router
   .route('/:id/transactions/:transactionId')
+  .get(transactionController.getTransaction)
   .put(transactionController.updateTransaction)
   .delete(transactionController.deleteTransaction);
 

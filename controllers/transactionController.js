@@ -45,7 +45,7 @@ exports.createTransaction = async (req, res) => {
     res.status(201).json({
       status: 'success',
       data: {
-        user,
+        newTransaction,
       },
     });
   } catch (err) {
@@ -91,12 +91,138 @@ exports.getAllTransactions = async (req, res) => {
   }
 };
 
+// Get a single transaction
+exports.getTransaction = async (req, res) => {
+  try {
+    const userId = req.params.id;
+    const transactionId = req.params.transactionId;
+
+    // Find the user by ID
+    const user = await User.findById(userId);
+    if (!user) {
+      return res.status(404).json({
+        status: 'fail',
+        message: 'User not found',
+      });
+    }
+
+    // Find the transaction by ID within the user's transactions array
+    const transaction = user.transactions.id(transactionId);
+    if (!transaction) {
+      return res.status(404).json({
+        status: 'fail',
+        message: 'Transaction not found',
+      });
+    }
+
+    // Send a success response with the transaction details
+    res.status(200).json({
+      status: 'success',
+      data: {
+        transaction,
+      },
+    });
+  } catch (err) {
+    // Handle any errors during the process
+    res.status(500).json({
+      status: 'error',
+      message: 'An error occurred while retrieving the transaction',
+    });
+  }
+};
+
 // Update transaction
 exports.updateTransaction = async (req, res) => {
-  // Implement the logic to update a transaction by ID
+  try {
+    const userId = req.params.id;
+    const transactionId = req.params.transactionId;
+    const { date, type, category, transactionAmount, title } = req.body;
+
+    // Find the user by ID
+    const user = await User.findById(userId);
+    if (!user) {
+      return res.status(404).json({
+        status: 'fail',
+        message: 'User not found',
+      });
+    }
+
+    // Find the transaction by ID within the user's transactions array
+    const transaction = user.transactions.id(transactionId);
+    if (!transaction) {
+      return res.status(404).json({
+        status: 'fail',
+        message: 'Transaction not found',
+      });
+    }
+
+    // Update the transaction fields
+    if (date) transaction.date = date;
+    if (type) transaction.type = type;
+    if (category) transaction.category = category;
+    if (transactionAmount) transaction.transactionAmount = transactionAmount;
+    if (title) transaction.title = title;
+
+    // Save the updated user document
+    await user.save();
+
+    // Send a success response with the updated transaction data
+    res.status(200).json({
+      status: 'success',
+      data: {
+        transaction,
+      },
+    });
+  } catch (err) {
+    // Handle any errors during the process
+    res.status(500).json({
+      status: 'error',
+      message: 'An error occurred while updating the transaction',
+    });
+  }
 };
 
 // Delete transaction
 exports.deleteTransaction = async (req, res) => {
-  // Implement the logic to delete a transaction by ID
+  try {
+    // Extract user ID and transaction ID from the request parameters
+    const { id, transactionId } = req.params;
+
+    // Find the user by ID
+    const user = await User.findById(id);
+    if (!user) {
+      return res
+        .status(404)
+        .json({ status: 'fail', message: 'User not found' });
+    }
+
+    // Find the transaction in the user's transactions array
+    const transactionIndex = user.transactions.findIndex(
+      (transaction) => transaction._id.toString() === transactionId
+    );
+
+    if (transactionIndex === -1) {
+      return res
+        .status(404)
+        .json({ status: 'fail', message: 'Transaction not found' });
+    }
+
+    // Remove the transaction from the user's transactions array
+    user.transactions.splice(transactionIndex, 1);
+
+    // Save the updated user document
+    await user.save();
+
+    // Send a success response
+    res.status(204).json({
+      status: 'success',
+      message: 'Transaction deleted successfully',
+    });
+  } catch (err) {
+    // Handle any errors during the process
+    res.status(500).json({
+      status: 'error',
+      message: 'An error occurred while deleting the transaction',
+    });
+  }
 };
