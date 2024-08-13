@@ -26,7 +26,7 @@ const promptSchema = new mongoose.Schema({
 // Prompt model
 const Prompt = mongoose.model('Prompt', promptSchema);
 
-// Joi validated function
+// Joi validation function
 function validatePrompt(prompt) {
   const schema = Joi.object({
     role: Joi.string().valid('user', 'ai').required(),

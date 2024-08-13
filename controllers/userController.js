@@ -1,35 +1,20 @@
-const User = require('../models/userModel').User;
-const { validateUser } = require('../models/userModel');
+const { User, validateUser } = require('../models/userModel');
 
 // Create user profile
 exports.createUserProfile = async (req, res) => {
   try {
-    // Validate the incoming request body
-    const { error } = validateUser(req.body);
-    if (error) return res.status(400).send(error.details[0].message);
+    // Create the user using the static method from the model
+    const user = await User.createUser(req.body);
 
-    // Check if the user already exists
-    let user = await User.findOne({ email: req.body.email });
-    if (user) return res.status(400).send('User already registered.');
-
-    // Create a new user
-    user = new User(req.body);
-
-    // Save the user to the database
-    await user.save();
-
+    // Respond with the created user data
     res.status(201).json({
       status: 'success',
       data: {
-        user: {
-          id: user._id,
-          name: user.name,
-          email: user.email
-        }
-      }
+        user,
+      },
     });
   } catch (err) {
-    res.status(500).json({ status: 'error', message: err.message });
+    res.status(400).json({ status: 'error', message: err.message });
   }
 };
 

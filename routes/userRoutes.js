@@ -5,12 +5,12 @@ const router = express.Router();
 
 // Route for creating a new user profile
 router
-  .route('/user')
+  .route('/profile')
   .post(userController.createUserProfile); 
 
 // Route for getting, updating, and deleting a specific user profile by ID
 router
-  .route('/user/:id')
+  .route('/:id/profile')
   .get(userController.getUserProfile) 
   .put(userController.updateUserProfile) 
   .delete(userController.deleteUserProfile); 
