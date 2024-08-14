@@ -1,4 +1,4 @@
-const User = require('../models/userModel').User;
+const User = require('../models/userModel');
 
 // Create user profile
 exports.createUserProfile = async (req, res) => {
@@ -8,6 +8,8 @@ exports.createUserProfile = async (req, res) => {
 // Get user profile
 exports.getUserProfile = async (req, res) => {
   // Implement the logic to get a user profile by ID
+  // const currentUser = await User.findById(req.params.id);
+  // res.send(currentUser);
 };
 
 // Update user profile
