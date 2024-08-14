@@ -1,6 +1,7 @@
 // Import
 const Joi = require('joi');
 const mongoose = require('mongoose');
+const { transactionSchema } = require('./transactionModel');
 
 // User schema
 const userSchema = new mongoose.Schema(
@@ -38,13 +39,7 @@ const userSchema = new mongoose.Schema(
       type: Number,
       min: 0,
     },
-    transactions: [
-      {
-        type: mongoose.Schema.Types.ObjectId,
-        ref: 'Transaction',
-        required: true,
-      },
-    ],
+    transactions: [transactionSchema],
     goals: [
       {
         type: mongoose.Schema.Types.ObjectId,

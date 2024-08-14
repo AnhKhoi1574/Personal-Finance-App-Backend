@@ -1,18 +1,20 @@
 const express = require('express');
 const transactionController = require('../controllers/transactionController');
+const authController = require('../controllers/authController');
 
 const router = express.Router();
 
 // Route for creating a new transaction and getting all transactions
 router
-  .route('/transaction')
-  .post(transactionController.createTransaction) 
-  .get(transactionController.getAllTransactions); 
-  
-// Route for updating and deleting a specific transaction by ID
+  .route('/')
+  .post(authController.protect, transactionController.createTransaction)
+  .get(authController.protect, transactionController.getAllTransactions);
+
+// Route for getting, updating and deleting a specific transaction by ID
 router
-  .route('/transaction/:id')
-  .put(transactionController.updateTransaction) 
-  .delete(transactionController.deleteTransaction); 
+  .route('/:transactionId')
+  .get(authController.protect, transactionController.getTransaction)
+  .put(authController.protect, transactionController.updateTransaction)
+  .delete(authController.protect, transactionController.deleteTransaction);
 
 module.exports = router;
