@@ -186,10 +186,10 @@ exports.updateTransaction = async (req, res) => {
 exports.deleteTransaction = async (req, res) => {
   try {
     // Extract user ID and transaction ID from the request parameters
-    const { id, transactionId } = req.params;
+    const { transactionId } = req.params;
 
     // Find the user by ID
-    const user = await User.findById(id);
+    const user = await User.findById(req.user._id);
     if (!user) {
       return res
         .status(404)
