@@ -1,19 +1,20 @@
 const express = require('express');
 const goalController = require('../controllers/goalController');
+const authController = require('../controllers/authController');
 
 const router = express.Router();
 
-// Route for creating a new goal and getting all goals
+// Routes for creating a new goal and getting all goals (protected)
 router
-  .route('/goal')
-  .post(goalController.createGoal)
-  .get(goalController.getAllGoals); 
+  .route('/')
+  .post(authController.protect, goalController.createGoal)
+  .get(authController.protect, goalController.getAllGoals);
 
-// Route for getting, updating, and deleting a specific goal by ID
+// Routes for getting, updating, and deleting a specific goal by ID (protected)
 router
-  .route('/goal/:id')
-  .get(goalController.getSpecificGoal) 
-  .put(goalController.updateGoal) 
-  .delete(goalController.deleteGoal); 
+  .route('/:goalId')
+  .get(authController.protect, goalController.getSpecificGoal)
+  .put(authController.protect, goalController.updateGoal)
+  .delete(authController.protect, goalController.deleteGoal);
 
 module.exports = router;
