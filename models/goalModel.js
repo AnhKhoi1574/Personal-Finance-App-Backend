@@ -1,4 +1,4 @@
-// Import
+// goalModel.js
 const Joi = require('joi');
 const mongoose = require('mongoose');
 
@@ -56,6 +56,8 @@ function validateGoal(goal) {
 }
 
 // Export
-exports.Goal = Goal;
-exports.goalSchema = goalSchema;
-exports.validateGoal = validateGoal;
+module.exports = {
+  Goal,
+  goalSchema,
+  validateGoal,
+};

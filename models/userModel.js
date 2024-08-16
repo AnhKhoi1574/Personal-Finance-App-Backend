@@ -2,6 +2,8 @@
 const Joi = require('joi');
 const mongoose = require('mongoose');
 const { transactionSchema } = require('./transactionModel');
+const { promptSchema } = require('./promptModel');
+const {goalSchema} = require('./goalModel');
 
 // User schema
 const userSchema = new mongoose.Schema(
@@ -40,18 +42,8 @@ const userSchema = new mongoose.Schema(
       min: 0,
     },
     transactions: [transactionSchema],
-    goals: [
-      {
-        type: mongoose.Schema.Types.ObjectId,
-        ref: 'Goal',
-      },
-    ],
-    prompts: [
-      {
-        type: mongoose.Schema.Types.ObjectId,
-        ref: 'Prompt',
-      },
-    ],
+    goals: [goalSchema],
+    prompts: [promptSchema],
   },
   {
     timestamps: true,

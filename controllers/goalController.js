@@ -19,7 +19,7 @@ exports.createGoal = async (req, res) => {
     }
 
     // Create a new goal
-    const newGoal = new Goal({ title, description, targetAmount, savedAmount, deadline, status });
+    const newGoal = { title, description, targetAmount, savedAmount, deadline, status };
 
     // Add the goal to the user's goals array
     user.goals.push(newGoal);
@@ -35,14 +35,14 @@ exports.createGoal = async (req, res) => {
       },
     });
   } catch (err) {
-    res.status(500).json({ status: 'error', message: 'An error occurred while creating the goal' });
+    res.status(500).json({ status: 'error', message: err.message });
   }
 };
 
 // Get all goals
 exports.getAllGoals = async (req, res) => {
   try {
-    const user = await User.findById(req.user._id);
+    const user = await User.findById(req.user._id).select('goals');
 
     if (!user) {
       return res.status(404).json({ status: 'fail', message: 'User not found' });
@@ -57,7 +57,7 @@ exports.getAllGoals = async (req, res) => {
       },
     });
   } catch (err) {
-    res.status(500).json({ status: 'error', message: 'An error occurred while retrieving goals' });
+    res.status(500).json({ status: 'error', message: err.message });
   }
 };
 
@@ -67,7 +67,7 @@ exports.getSpecificGoal = async (req, res) => {
     const userId = req.user._id;
     const goalId = req.params.goalId;
 
-    const user = await User.findById(userId);
+    const user = await User.findById(userId).select('goals');
     if (!user) {
       return res.status(404).json({ status: 'fail', message: 'User not found' });
     }
@@ -84,7 +84,7 @@ exports.getSpecificGoal = async (req, res) => {
       },
     });
   } catch (err) {
-    res.status(500).json({ status: 'error', message: 'An error occurred while retrieving the goal' });
+    res.status(500).json({ status: 'error', message: err.message });
   }
 };
 
@@ -95,7 +95,7 @@ exports.updateGoal = async (req, res) => {
     const goalId = req.params.goalId;
     const { title, description, targetAmount, savedAmount, deadline, status } = req.body;
 
-    const user = await User.findById(userId);
+    const user = await User.findById(userId).select('goals');
     if (!user) {
       return res.status(404).json({ status: 'fail', message: 'User not found' });
     }
@@ -105,6 +105,7 @@ exports.updateGoal = async (req, res) => {
       return res.status(404).json({ status: 'fail', message: 'Goal not found' });
     }
 
+    // Update fields
     if (title) goal.title = title;
     if (description) goal.description = description;
     if (targetAmount) goal.targetAmount = targetAmount;
@@ -121,7 +122,7 @@ exports.updateGoal = async (req, res) => {
       },
     });
   } catch (err) {
-    res.status(500).json({ status: 'error', message: 'An error occurred while updating the goal' });
+    res.status(500).json({ status: 'error', message: err.message });
   }
 };
 
@@ -131,7 +132,7 @@ exports.deleteGoal = async (req, res) => {
     const userId = req.user._id;
     const goalId = req.params.goalId;
 
-    const user = await User.findById(userId);
+    const user = await User.findById(userId).select('goals');
     if (!user) {
       return res.status(404).json({ status: 'fail', message: 'User not found' });
     }
@@ -149,6 +150,7 @@ exports.deleteGoal = async (req, res) => {
       message: 'Goal deleted successfully',
     });
   } catch (err) {
-    res.status(500).json({ status: 'error', message: 'An error occurred while deleting the goal' });
+    res.status(500).json({ status: 'error', message: err.message });
   }
 };
+
