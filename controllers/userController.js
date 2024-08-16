@@ -65,6 +65,8 @@ exports.getUserProfile = async (req, res) => {
   }
 };
 
+
+
 // Update the authenticated user's profile
 exports.updateUserProfile = async (req, res) => {
   try {
@@ -117,8 +119,9 @@ exports.deleteUserProfile = async (req, res) => {
       });
     }
 
-    res.status(204).json({
+    res.status(200).json({
       status: 'success',
+      message: 'User profile deleted successfully',
       data: null,
     });
   } catch (err) {
@@ -128,3 +131,4 @@ exports.deleteUserProfile = async (req, res) => {
     });
   }
 };
+
