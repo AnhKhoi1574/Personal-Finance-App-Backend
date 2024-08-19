@@ -1,60 +1,62 @@
 // Import
 const Joi = require('joi');
 const mongoose = require('mongoose');
+const { transactionSchema } = require('./transactionModel');
 
 // User schema
-const userSchema = new mongoose.Schema({
-  name: {
-    type: String,
-    required: true,
-    minlength: 5,
-    maxlength: 50,
-    trim: true,
+const userSchema = new mongoose.Schema(
+  {
+    name: {
+      type: String,
+      required: true,
+      minlength: 5,
+      maxlength: 50,
+      trim: true,
+    },
+    email: {
+      type: String,
+      required: true,
+      unique: true,
+      minlength: 10,
+      maxlength: 50,
+      lowercase: true,
+      trim: true,
+    },
+    password: {
+      type: String,
+      required: true,
+      minlength: 5,
+    },
+    birthday: {
+      type: Date,
+      required: true,
+    },
+    initialBalance: {
+      type: Number,
+      min: 0,
+    },
+    currentBalance: {
+      type: Number,
+      min: 0,
+    },
+    transactions: [transactionSchema],
+    goals: [
+      {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'Goal',
+      },
+    ],
+    prompts: [
+      {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'Prompt',
+      },
+    ],
   },
-  email: {
-    type: String,
-    required: true,
-    unique: true,
-    minlength: 10,
-    maxlength: 50,
-    lowercase: true,
-    trim: true,
-  },
-  password: {
-    type: String,
-    required: true,
-    minlength: 5,
-  },
-  birthday: {
-    type: Date,
-    required: true,
-  },
-  initialBalance: {
-    type: Number,
-    required: true,
-    min: 0,
-  },
-  currentBalance: {
-    type: Number,
-    required: true,
-    min: 0,
-  },
-  transactions: [{
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'Transaction',
-    required: true,
-  }],
-  goals: [{
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'Goal',
-  }],
-  prompts: [{
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'Prompt',
-  }],
-}, {
-  timestamps: true,
-});
+  {
+    timestamps: true,
+  }
+);
 
 // Joi validated function
 function validateUser(user) {

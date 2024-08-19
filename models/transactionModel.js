@@ -46,7 +46,7 @@ function validateTransaction(transaction) {
     transactionAmount: Joi.number().min(0).required(),
     title: Joi.string().min(3).max(50),
   });
-  return Joi.validate(transaction);
+  return schema.validate(transaction);
 }
 
 // export
