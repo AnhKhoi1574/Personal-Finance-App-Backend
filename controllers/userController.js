@@ -1,42 +1,6 @@
 // Import necessary modules
+const bcrypt = require('bcrypt');
 const { User, validateUser } = require('../models/userModel');
-
-// Create a new user profile
-exports.createUserProfile = async (req, res) => {
-  try {
-    // Extract user details from the request body
-    const { name, email, password, birthday, initialBalance, currentBalance } = req.body;
-
-    // Validate user input
-    const { error } = validateUser(req.body);
-    if (error) return res.status(400).json({ status: 'fail', message: error.details[0].message });
-
-    // Create a new user profile
-    const newUser = new User({
-      name,
-      email,
-      password,
-      birthday,
-      initialBalance,
-      currentBalance,
-    });
-
-    // Save the new user profile
-    await newUser.save();
-
-    res.status(201).json({
-      status: 'success',
-      data: {
-        user: newUser,
-      },
-    });
-  } catch (err) {
-    res.status(400).json({
-      status: 'fail',
-      message: err.message,
-    });
-  }
-};
 
 // Get the authenticated user's profile
 exports.getUserProfile = async (req, res) => {
@@ -50,6 +14,9 @@ exports.getUserProfile = async (req, res) => {
         message: 'User not found',
       });
     }
+
+      // Remove the password before returning the user data
+      user.password = undefined;
 
     res.status(200).json({
       status: 'success',
@@ -66,8 +33,6 @@ exports.getUserProfile = async (req, res) => {
 };
 
 
-
-// Update the authenticated user's profile
 exports.updateUserProfile = async (req, res) => {
   try {
     // Find the user by ID using req.user._id
@@ -84,13 +49,19 @@ exports.updateUserProfile = async (req, res) => {
     const { name, email, password, birthday, initialBalance, currentBalance } = req.body;
     if (name) user.name = name;
     if (email) user.email = email;
-    if (password) user.password = password;
+    if (password) {
+      const salt = await bcrypt.genSalt(12);
+      user.password = await bcrypt.hash(password, salt);
+    }
     if (birthday) user.birthday = birthday;
-    if (initialBalance) user.initialBalance = initialBalance;
-    if (currentBalance) user.currentBalance = currentBalance;
+    if (initialBalance !== undefined) user.initialBalance = initialBalance;
+    if (currentBalance !== undefined) user.currentBalance = currentBalance;
 
     // Save the updated user document
     await user.save();
+
+    // Remove the password before returning the user data
+    user.password = undefined;
 
     res.status(200).json({
       status: 'success',

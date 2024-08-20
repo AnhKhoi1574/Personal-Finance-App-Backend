@@ -34,10 +34,12 @@ const userSchema = new mongoose.Schema(
     initialBalance: {
       type: Number,
       min: 0,
+      default: 0,
     },
     currentBalance: {
       type: Number,
       min: 0,
+      default: 0
     },
     transactions: [transactionSchema],
     goals: [
