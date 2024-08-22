@@ -6,7 +6,7 @@ const app = express();
 
 // Middleware setup
 app.use(cors());
-app.use(bodyParser.json({ limit: '10mb' })); // Increase the limit 
+app.use(bodyParser.json({ limit: '10mb' })); // Increase the limit
 
 // Import routes
 const authRoutes = require('./routes/authRoutes');
@@ -16,8 +16,8 @@ const goalRoutes = require('./routes/goalRoutes');
 const budgetRoutes = require('./routes/budgetRoutes');
 
 // Use routes
-app.use('/api/auth', authRoutes);
-app.use('/api/users', userRoutes);
+app.use('/api/', authRoutes);
+app.use('/api/profile', userRoutes);
 app.use('/api/transactions', transactionRoutes);
 app.use('/api/goals', goalRoutes);
 app.use('/api/budgets', budgetRoutes);

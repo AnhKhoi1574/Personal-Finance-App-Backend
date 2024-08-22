@@ -9,7 +9,7 @@ router.use(authController.protect);
 
 // Route for getting, updating, and deleting the authenticated user's profile
 router
-  .route('/profile')
+  .route('/')
   .get(userController.getUserProfile)
   .put(userController.updateUserProfile)
   .delete(userController.deleteUserProfile);
