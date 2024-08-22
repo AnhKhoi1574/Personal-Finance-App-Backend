@@ -31,13 +31,10 @@ const userSchema = new mongoose.Schema(
       type: Date,
       required: true,
     },
-    initialBalance: {
-      type: Number,
-      min: 0,
-    },
     currentBalance: {
       type: Number,
       min: 0,
+      default: 0
     },
     transactions: [transactionSchema],
     goals: [
@@ -65,7 +62,6 @@ function validateUser(user) {
     email: Joi.string().email().min(10).max(50).required(),
     password: Joi.string().min(5).required(),
     birthday: Joi.date().required(),
-    initialBalance: Joi.number().min(0).required(),
     currentBalance: Joi.number().min(0).required(),
   });
   return schema.validate(user);

@@ -34,10 +34,9 @@ function validatePrompt(prompt) {
     content: Joi.string().min(3).max(250).required(),
     createdDate: Joi.date(),
   });
-  return Joi.validate(prompt);
+  return schema.validate(prompt);
 }
 
 // export
 exports.Prompt = Prompt;
-exports.promptSchema = promptSchema;
 exports.validatePrompt = validatePrompt;

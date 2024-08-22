@@ -4,12 +4,12 @@ const authController = require('../controllers/authController');
 
 const router = express.Router();
 
-// Route for creating a new user profile
-router.route('/user').post(userController.createUserProfile);
+// Protect all routes after this middleware
+router.use(authController.protect);
 
-// Route for getting, updating, and deleting a specific user profile by ID
+// Route for getting, updating, and deleting the authenticated user's profile
 router
-  .route('/user/:id')
+  .route('/profile')
   .get(userController.getUserProfile)
   .put(userController.updateUserProfile)
   .delete(userController.deleteUserProfile);

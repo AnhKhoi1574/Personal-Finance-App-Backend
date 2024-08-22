@@ -6,7 +6,7 @@ const app = express();
 
 // Middleware setup
 app.use(cors());
-app.use(bodyParser.json());
+app.use(bodyParser.json({ limit: '10mb' })); // Increase the limit 
 
 // Import routes
 const authRoutes = require('./routes/authRoutes');
