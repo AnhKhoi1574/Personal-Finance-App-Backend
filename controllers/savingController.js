@@ -183,8 +183,6 @@ exports.deleteSaving = async (req, res) => {
   }
 };
 
-const { User } = require('../models/userModel');
-
 // Create saving, Get saving, Update saving, Delete saving...
 
 // Add money to saving
@@ -236,7 +234,7 @@ exports.addMoneyToSaving = async (req, res) => {
     user.transactions.push({
       type: 'expense',
       category: 'saving',
-      amount,
+      transactionAmount:amount,
       date: new Date(),
       isSavingsTransfer: true,
     });
