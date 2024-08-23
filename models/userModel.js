@@ -2,6 +2,7 @@
 const Joi = require('joi');
 const mongoose = require('mongoose');
 const { transactionSchema } = require('./transactionModel');
+const { savingSchema } = require('./savingModel');
 
 // User schema
 const userSchema = new mongoose.Schema(
@@ -34,15 +35,10 @@ const userSchema = new mongoose.Schema(
     currentBalance: {
       type: Number,
       min: 0,
-      default: 0
+      default: 0,
     },
     transactions: [transactionSchema],
-    goals: [
-      {
-        type: mongoose.Schema.Types.ObjectId,
-        ref: 'Goal',
-      },
-    ],
+    savings: [savingSchema],
     prompts: [
       {
         type: mongoose.Schema.Types.ObjectId,

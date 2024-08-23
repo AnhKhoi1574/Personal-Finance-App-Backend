@@ -13,13 +13,21 @@ const transactionSchema = new mongoose.Schema({
     enum: ['income', 'expense'],
     required: true,
     trim: true,
+    lowercase: true,
   },
   category: {
     type: String,
+    enum: [
+      'household',
+      'shopping',
+      'food',
+      'utilities',
+      'transportation',
+      'others',
+    ],
     required: true,
-    minlength: 3,
-    maxlength: 50,
     trim: true,
+    lowercase: true,
   },
   transactionAmount: {
     type: Number,
@@ -32,6 +40,7 @@ const transactionSchema = new mongoose.Schema({
     maxlength: 50,
     trim: true,
   },
+  isSavingsTransfer: { type: Boolean, default: false }, // check if it is a transfer related to saving amount
 });
 
 // Transaction model

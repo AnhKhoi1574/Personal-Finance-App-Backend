@@ -1,4 +1,4 @@
-const Goal = require('../models/goalModel').Goal;
+const {} = require('../models/savingModel');
 
 // Create goal
 exports.createGoal = async (req, res) => {

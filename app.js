@@ -12,14 +12,14 @@ app.use(bodyParser.json({ limit: '10mb' })); // Increase the limit
 const authRoutes = require('./routes/authRoutes');
 const userRoutes = require('./routes/userRoutes');
 const transactionRoutes = require('./routes/transactionRoutes');
-const goalRoutes = require('./routes/goalRoutes');
+const savingRoutes = require('./routes/savingRoutes');
 const budgetRoutes = require('./routes/budgetRoutes');
 
 // Use routes
 app.use('/api/', authRoutes);
 app.use('/api/profile', userRoutes);
 app.use('/api/transactions', transactionRoutes);
-app.use('/api/goals', goalRoutes);
+app.use('/api/savings', savingRoutes);
 app.use('/api/budgets', budgetRoutes);
 
 module.exports = app;
