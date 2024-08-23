@@ -15,6 +15,7 @@ const savingSchema = new mongoose.Schema({
   currentAmount: {
     type: Number,
     default: 0,
+    required: true,
   },
   targetDate: {
     type: Date,

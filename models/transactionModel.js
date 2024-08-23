@@ -17,14 +17,14 @@ const transactionSchema = new mongoose.Schema({
   },
   category: {
     type: String,
-    enum: [
-      'household',
-      'shopping',
-      'food',
-      'utilities',
-      'transportation',
-      'others',
-    ],
+    // enum: [
+    //   'household',
+    //   'shopping',
+    //   'food',
+    //   'utilities',
+    //   'transportation',
+    //   'others',
+    // ],
     required: true,
     trim: true,
     lowercase: true,
