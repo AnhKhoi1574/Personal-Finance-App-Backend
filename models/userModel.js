@@ -38,7 +38,7 @@ const userSchema = new mongoose.Schema(
       default: 0,
     },
     transactions: [transactionSchema],
-    savings: [savingSchema],
+    saving: savingSchema,
     prompts: [
       {
         type: mongoose.Schema.Types.ObjectId,

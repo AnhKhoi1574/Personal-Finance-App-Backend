@@ -5,15 +5,11 @@ const authController = require('../controllers/authController');
 const router = express.Router();
 
 // Route for creating a new saving and getting all savings
-router
-  .route('/')
-  .post(authController.protect, savingController.createSaving)
-  .get(authController.protect, savingController.getAllSavings);
-
 // Route for getting, updating, and deleting a specific saving by ID
 router
-  .route('/:savingId')
-  .get(authController.protect, savingController.getSpecificSaving)
+  .route('/')
+  .get(authController.protect, savingController.getSaving)
+  .post(authController.protect, savingController.createSaving)
   .put(authController.protect, savingController.updateSaving)
   .delete(authController.protect, savingController.deleteSaving);
 

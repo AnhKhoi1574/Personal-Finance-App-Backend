@@ -19,7 +19,7 @@ const budgetRoutes = require('./routes/budgetRoutes');
 app.use('/api/', authRoutes);
 app.use('/api/profile', userRoutes);
 app.use('/api/transactions', transactionRoutes);
-app.use('/api/savings', savingRoutes);
+app.use('/api/saving', savingRoutes);
 app.use('/api/budgets', budgetRoutes);
 
 module.exports = app;

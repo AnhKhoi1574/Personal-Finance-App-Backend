@@ -23,6 +23,7 @@ const transactionSchema = new mongoose.Schema({
     //   'food',
     //   'utilities',
     //   'transportation',
+    //    'saving'
     //   'others',
     // ],
     required: true,
