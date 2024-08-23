@@ -182,3 +182,79 @@ exports.deleteSaving = async (req, res) => {
     console.error(err);
   }
 };
+
+const { User } = require('../models/userModel');
+
+// Create saving, Get saving, Update saving, Delete saving...
+
+// Add money to saving
+exports.addMoneyToSaving = async (req, res) => {
+  try {
+    const userId = req.user._id;
+    const { amount } = req.body;
+
+    // Validate input
+    if (!amount || amount <= 0) {
+      return res.status(400).json({
+        status: 'error',
+        message: 'Amount must be a positive number',
+      });
+    }
+
+    // Find the user by ID
+    const user = await User.findById(userId);
+
+    if (!user) {
+      return res.status(404).json({
+        status: 'fail',
+        message: 'User not found',
+      });
+    }
+
+    if (!user.saving) {
+      return res.status(404).json({
+        status: 'fail',
+        message: 'No saving goal found',
+      });
+    }
+
+    // Check if user has enough balance
+    if (user.currentBalance < amount) {
+      return res.status(400).json({
+        status: 'error',
+        message: 'Insufficient balance to add money to saving goal',
+      });
+    }
+
+    // Deduct amount from current balance
+    user.currentBalance -= amount;
+
+    // Add amount to the saving's current amount
+    user.saving.currentAmount += amount;
+
+    // Create a transaction for the saving transfer
+    user.transactions.push({
+      type: 'expense',
+      category: 'saving',
+      amount,
+      date: new Date(),
+      isSavingsTransfer: true,
+    });
+
+    // Save the updated user document
+    await user.save();
+
+    // Respond with the updated saving goal
+    res.status(200).json({
+      status: 'success',
+      message: 'Money added to saving goal successfully',
+      data: user.saving,
+    });
+  } catch (error) {
+    res.status(500).json({
+      status: 'error',
+      message: 'An error occurred while adding money to the saving goal',
+      error: error.message,
+    });
+  }
+};
