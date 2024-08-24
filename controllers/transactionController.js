@@ -8,10 +8,16 @@ const { User } = require('../models/userModel');
 exports.createTransaction = async (req, res) => {
   try {
     const userId = req.user._id;
-    const {date, type, transactionAmount, category, title } = req.body;
+    const { date, type, transactionAmount, category, title } = req.body;
 
     // Validate input with Joi
-    const { error } = validateTransaction({ date: new Date(), type, category, transactionAmount, title });
+    const { error } = validateTransaction({
+      date: new Date(),
+      type,
+      category,
+      transactionAmount,
+      title,
+    });
     if (error) {
       return res.status(400).json({
         status: 'error',
@@ -38,8 +44,14 @@ exports.createTransaction = async (req, res) => {
     });
 
     // Handle automatic savings if the transaction is of type 'income'
-    if (type === 'income' && user.saving && user.saving.isAutoSavingEnabled && user.saving.autoSavingPercentage > 0) {
-      const savingAmount = (transactionAmount * user.saving.autoSavingPercentage) / 100;
+    if (
+      type === 'income' &&
+      user.saving &&
+      user.saving.isAutoSavingEnabled &&
+      user.saving.autoSavingPercentage > 0
+    ) {
+      const savingAmount =
+        (transactionAmount * user.saving.autoSavingPercentage) / 100;
       user.saving.currentAmount += savingAmount;
 
       // Create a corresponding savings transaction
@@ -60,7 +72,8 @@ exports.createTransaction = async (req, res) => {
     user.transactions.push(newTransaction);
 
     // Update the user's current balance
-    user.currentBalance += type === 'income' ? transactionAmount : -transactionAmount;
+    user.currentBalance +=
+      type === 'income' ? transactionAmount : -transactionAmount;
 
     // Save the updated user document
     await user.save();
@@ -294,5 +307,3 @@ exports.deleteTransaction = async (req, res) => {
     });
   }
 };
-
-

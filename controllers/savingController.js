@@ -341,30 +341,34 @@ exports.toggleAutomaticSaving = async (req, res) => {
     const userId = req.user._id;
     const { isAutoSavingEnabled, autoSavingPercentage } = req.body;
 
-  // Validate input
-  // Condition 1: Check if "isAutoSavingEnabled" is undefined
-  if (isAutoSavingEnabled === undefined) {
-    return res.status(400).json({
-      status: 'error',
-      message: 'isAutoSavingEnabled must be provided',
-    });
-  }
+    // Validate input
+    // Condition 1: Check if "isAutoSavingEnabled" is undefined
+    if (isAutoSavingEnabled === undefined) {
+      return res.status(400).json({
+        status: 'error',
+        message: 'isAutoSavingEnabled must be provided',
+      });
+    }
 
-  // Condition 2: Check if "isAutoSavingEnabled" is turned on, but user do not input the "autoSavingPercentage"
-  if (isAutoSavingEnabled && autoSavingPercentage === undefined) {
-    return res.status(400).json({
-      status: 'error',
-      message: 'When auto-saving is enabled, autoSavingPercentage must be provided.',
-    });
-  }
+    // Condition 2: Check if "isAutoSavingEnabled" is turned on, but user do not input the "autoSavingPercentage"
+    if (isAutoSavingEnabled && autoSavingPercentage === undefined) {
+      return res.status(400).json({
+        status: 'error',
+        message:
+          'When auto-saving is enabled, autoSavingPercentage must be provided.',
+      });
+    }
 
-  // Condition 3: Check if "autoSavingPercentage" must be between 1 and 50
-  if (autoSavingPercentage !== undefined && (autoSavingPercentage < 1 || autoSavingPercentage > 50)) {
-    return res.status(400).json({
-      status: 'error',
-      message: 'If provided, autoSavingPercentage must be between 1 and 50.',
-    });
-  }
+    // Condition 3: Check if "autoSavingPercentage" must be between 1 and 50
+    if (
+      autoSavingPercentage !== undefined &&
+      (autoSavingPercentage < 1 || autoSavingPercentage > 50)
+    ) {
+      return res.status(400).json({
+        status: 'error',
+        message: 'If provided, autoSavingPercentage must be between 1 and 50.',
+      });
+    }
     // Find the user by ID
     const user = await User.findById(userId);
 
