@@ -77,7 +77,7 @@ exports.createTransaction = async (req, res) => {
 
     // Update the user's current balance
     user.currentBalance +=
-      type === 'income' ? transactionAmount : -transactionAmount;
+      type === 'income' ? actualTransactionAmount : -transactionAmount;
 
     // Save the updated user document
     await user.save();
