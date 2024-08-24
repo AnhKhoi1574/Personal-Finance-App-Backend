@@ -17,8 +17,14 @@ router
   .route('/add-money')
   .post(authController.protect, savingController.addMoneyToSaving);
 
+// Route to withdraw money from saving
 router
   .route('/withdraw-money')
   .post(authController.protect, savingController.withdrawFromSaving);
+
+// Route to toggle automatic saving feature
+router
+  .route('/toggle-automatic')
+  .post(authController.protect, savingController.toggleAutomaticSaving);
 
 module.exports = router;

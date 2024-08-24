@@ -38,8 +38,8 @@ exports.createSaving = async (req, res) => {
       targetAmount,
       targetDate,
       currentAmount: 0, // Initially, the saved amount is 0
-      isAutomaticSavingOn: false,
-      savingPercentage: 0,
+      isAutoSavingEnabled: false,
+      autoSavingPercentage: 0,
     };
 
     // Save the user document
@@ -294,7 +294,7 @@ exports.withdrawFromSaving = async (req, res) => {
     if (user.saving.currentAmount < amount) {
       return res.status(400).json({
         status: 'error',
-        message: 'Insufficient savings amount to withdraw',
+        message: 'Insufficient saving amount to withdraw',
       });
     }
 
@@ -320,7 +320,7 @@ exports.withdrawFromSaving = async (req, res) => {
     // Respond with the updated saving goal and current balance
     res.status(200).json({
       status: 'success',
-      message: 'Money withdrawn from savings successfully',
+      message: 'Money withdrawn from saving successfully',
       data: {
         currentSaving: user.saving,
         currentBalance: user.currentBalance,
@@ -331,6 +331,66 @@ exports.withdrawFromSaving = async (req, res) => {
     res.status(500).json({
       status: 'error',
       message: 'An error occurred while withdrawing money from the saving goal',
+      error: error.message,
+    });
+  }
+};
+
+exports.toggleAutomaticSaving = async (req, res) => {
+  try {
+    const userId = req.user._id;
+    const { isAutoSavingEnabled, autoSavingPercentage } = req.body;
+
+    // Validate input
+    if (
+      isAutoSavingEnabled === undefined ||
+      (autoSavingPercentage !== undefined &&
+        (autoSavingPercentage < 1 || autoSavingPercentage > 50))
+    ) {
+      return res.status(400).json({
+        status: 'error',
+        message:
+          'Invalid input. Ensure that the saving percentage is between 1 and 50.',
+      });
+    }
+
+    // Find the user by ID
+    const user = await User.findById(userId);
+
+    if (!user) {
+      return res
+        .status(404)
+        .json({ status: 'error', message: 'User not found' });
+    }
+
+    if (!user.saving) {
+      return res
+        .status(404)
+        .json({ status: 'error', message: 'No saving goal found' });
+    }
+
+    // Update the automatic saving settings
+    user.saving.isAutoSavingEnabled = isAutoSavingEnabled;
+    if (autoSavingPercentage !== undefined) {
+      user.saving.autoSavingPercentage = autoSavingPercentage;
+    }
+
+    // Save the updated user document
+    await user.save();
+
+    // Respond with the updated saving settings
+    res.status(200).json({
+      status: 'success',
+      message: 'Automatic saving settings updated successfully',
+      data: {
+        isAutoSavingEnabled: user.saving.isAutoSavingEnabled,
+        autoSavingPercentage: user.saving.autoSavingPercentage,
+      },
+    });
+  } catch (error) {
+    res.status(500).json({
+      status: 'error',
+      message: 'An error occurred while updating automatic saving settings',
       error: error.message,
     });
   }
