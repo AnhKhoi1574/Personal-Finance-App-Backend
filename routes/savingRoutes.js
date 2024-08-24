@@ -25,6 +25,6 @@ router
 // Route to toggle automatic saving feature
 router
   .route('/toggle-automatic')
-  .post(authController.protect, savingController.toggleAutomaticSaving);
+  .patch(authController.protect, savingController.toggleAutomaticSaving);
 
 module.exports = router;
