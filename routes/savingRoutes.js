@@ -18,7 +18,7 @@ router
   .post(authController.protect, savingController.addMoneyToSaving);
 
 router
-  .route('/withdraw')
+  .route('/withdraw-money')
   .post(authController.protect, savingController.withdrawFromSaving);
 
 module.exports = router;

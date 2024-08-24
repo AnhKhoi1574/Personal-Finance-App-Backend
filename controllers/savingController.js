@@ -183,8 +183,6 @@ exports.deleteSaving = async (req, res) => {
   }
 };
 
-// Create saving, Get saving, Update saving, Delete saving...
-
 // Add money to saving
 exports.addMoneyToSaving = async (req, res) => {
   try {
@@ -230,14 +228,15 @@ exports.addMoneyToSaving = async (req, res) => {
     // Add amount to the saving's current amount
     user.saving.currentAmount += amount;
 
-    // Create a transaction for the saving transfer
-    user.transactions.push({
+    const addMoneyTransaction = {
       type: 'expense',
       category: 'saving',
       transactionAmount:amount,
       date: new Date(),
       isSavingsTransfer: true,
-    });
+    }
+    // Create a transaction for the saving transfer
+    user.transactions.push(addMoneyTransaction);
 
     // Save the updated user document
     await user.save();
@@ -246,7 +245,11 @@ exports.addMoneyToSaving = async (req, res) => {
     res.status(200).json({
       status: 'success',
       message: 'Money added to saving goal successfully',
-      data: user.saving,
+      data: {
+        currentSaving: user.saving,
+        currentBalance: user.currentBalance,
+        transaction: addMoneyTransaction,
+      }
     });
   } catch (error) {
     res.status(500).json({
@@ -304,7 +307,7 @@ exports.withdrawFromSaving = async (req, res) => {
     // Create a new transaction for the withdrawal
     const withdrawalTransaction = {
       type: 'income',
-      transactionAmount:amount,
+      transactionAmount: amount,
       date: new Date(),
       isSavingsTransfer: true,
     };

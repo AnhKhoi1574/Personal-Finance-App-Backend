@@ -51,7 +51,7 @@ function validateTransaction(transaction) {
   const schema = Joi.object({
     date: Joi.date().required(),
     type: Joi.string().valid('income', 'expense').required(),
-    category: Joi.string().min(3).max(50).optional(),
+    category: Joi.string().min(3).max(50),
     transactionAmount: Joi.number().min(0).required(),
     title: Joi.string().min(3).max(50),
   });
