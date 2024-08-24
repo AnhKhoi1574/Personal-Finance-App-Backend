@@ -33,6 +33,8 @@ exports.createTransaction = async (req, res) => {
         .json({ status: 'error', message: 'User not found' });
     }
 
+    let actualTransactionAmount = transactionAmount;
+
     // Create the transaction
     const newTransaction = new Transaction({
       date,
@@ -52,7 +54,9 @@ exports.createTransaction = async (req, res) => {
     ) {
       const savingAmount =
         (transactionAmount * user.saving.autoSavingPercentage) / 100;
+
       user.saving.currentAmount += savingAmount;
+      actualTransactionAmount -= savingAmount;
 
       // Create a corresponding savings transaction
       const savingTransaction = new Transaction({
