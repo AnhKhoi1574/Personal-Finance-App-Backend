@@ -231,10 +231,10 @@ exports.addMoneyToSaving = async (req, res) => {
     const addMoneyTransaction = {
       type: 'expense',
       category: 'saving',
-      transactionAmount:amount,
+      transactionAmount: amount,
       date: new Date(),
       isSavingsTransfer: true,
-    }
+    };
     // Create a transaction for the saving transfer
     user.transactions.push(addMoneyTransaction);
 
@@ -249,7 +249,7 @@ exports.addMoneyToSaving = async (req, res) => {
         currentSaving: user.saving,
         currentBalance: user.currentBalance,
         transaction: addMoneyTransaction,
-      }
+      },
     });
   } catch (error) {
     res.status(500).json({
@@ -335,4 +335,3 @@ exports.withdrawFromSaving = async (req, res) => {
     });
   }
 };
-

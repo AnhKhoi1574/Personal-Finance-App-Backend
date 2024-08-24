@@ -15,8 +15,8 @@ exports.getUserProfile = async (req, res) => {
       });
     }
 
-      // Remove the password before returning the user data
-      user.password = undefined;
+    // Remove the password before returning the user data
+    user.password = undefined;
 
     res.status(200).json({
       status: 'success',
@@ -32,7 +32,6 @@ exports.getUserProfile = async (req, res) => {
     });
   }
 };
-
 
 exports.updateUserProfile = async (req, res) => {
   try {
@@ -105,4 +104,3 @@ exports.deleteUserProfile = async (req, res) => {
     });
   }
 };
-
