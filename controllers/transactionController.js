@@ -122,12 +122,13 @@ exports.getAllTransactions = async (req, res) => {
 
     let transactions = user.transactions;
 
-    // Apply filtering by type and category
-    if (type || category) {
+    if (type || category || typeof isSavingsTransfer !== 'undefined') {
       transactions = transactions.filter((transaction) => {
         return (
           (!type || transaction.type === type) &&
-          (!category || transaction.category === category)
+          (!category || transaction.category === category) &&
+          (typeof isSavingsTransfer === 'undefined' ||
+            transaction.isSavingsTransfer === (isSavingsTransfer === 'true'))
         );
       });
     }
