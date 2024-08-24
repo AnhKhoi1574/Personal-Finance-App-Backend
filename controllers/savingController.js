@@ -256,3 +256,80 @@ exports.addMoneyToSaving = async (req, res) => {
     });
   }
 };
+
+// Withdraw Money from Saving Goal
+exports.withdrawFromSaving = async (req, res) => {
+  try {
+    const userId = req.user._id;
+    const { amount } = req.body;
+
+    // Validate input
+    if (!amount || amount <= 0) {
+      return res.status(400).json({
+        status: 'error',
+        message: 'Please provide a valid amount to withdraw',
+      });
+    }
+
+    // Find the user by ID
+    const user = await User.findById(userId);
+
+    if (!user) {
+      return res
+        .status(404)
+        .json({ status: 'error', message: 'User not found' });
+    }
+
+    if (!user.saving) {
+      return res.status(404).json({
+        status: 'error',
+        message: 'No saving goal found to withdraw from',
+      });
+    }
+
+    // Check if the currentAmount is sufficient
+    if (user.saving.currentAmount < amount) {
+      return res.status(400).json({
+        status: 'error',
+        message: 'Insufficient savings amount to withdraw',
+      });
+    }
+
+    // Deduct the amount from the saving goal
+    user.saving.currentAmount -= amount;
+
+    // Add the withdrawn amount to the user's current balance
+    user.currentBalance += amount;
+
+    // Create a new transaction for the withdrawal
+    const withdrawalTransaction = {
+      type: 'income',
+      transactionAmount:amount,
+      date: new Date(),
+      isSavingsTransfer: true,
+    };
+
+    user.transactions.push(withdrawalTransaction);
+
+    // Save the updated user document
+    await user.save();
+
+    // Respond with the updated saving goal and current balance
+    res.status(200).json({
+      status: 'success',
+      message: 'Money withdrawn from savings successfully',
+      data: {
+        currentSaving: user.saving,
+        currentBalance: user.currentBalance,
+        transaction: withdrawalTransaction,
+      },
+    });
+  } catch (error) {
+    res.status(500).json({
+      status: 'error',
+      message: 'An error occurred while withdrawing money from the saving goal',
+      error: error.message,
+    });
+  }
+};
+
