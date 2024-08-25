@@ -14,6 +14,7 @@ const userRoutes = require('./routes/userRoutes');
 const transactionRoutes = require('./routes/transactionRoutes');
 const goalRoutes = require('./routes/goalRoutes');
 const budgetRoutes = require('./routes/budgetRoutes');
+const gptRoutes = require('./routes/gptRoutes');
 
 // Use routes
 app.use('/api/auth', authRoutes);
@@ -21,5 +22,6 @@ app.use('/api/users', userRoutes);
 app.use('/api/transactions', transactionRoutes);
 app.use('/api/goals', goalRoutes);
 app.use('/api/budgets', budgetRoutes);
+app.use('/api/gpt', gptRoutes);
 
 module.exports = app;
