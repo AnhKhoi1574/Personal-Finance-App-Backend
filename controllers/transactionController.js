@@ -61,10 +61,23 @@ exports.createTransaction = async (req, res) => {
 // Get all transactions
 exports.getAllTransactions = async (req, res) => {
   try {
-    // Find the user by ID
-    const user = await User.findById(req.user._id);
+    const { type, category, sort } = req.query; // Extracting query parameters
+    const userId = req.user._id;
 
-    // Check if the user exists
+    // Build the filter object
+    const filter = { _id: userId };
+
+    if (type) {
+      filter['transactions.type'] = type;
+    }
+
+    if (category) {
+      filter['transactions.category'] = category;
+    }
+
+    // Find the user with the filtered transactions
+    const user = await User.findById(userId);
+
     if (!user) {
       return res.status(404).json({
         status: 'fail',
@@ -72,8 +85,41 @@ exports.getAllTransactions = async (req, res) => {
       });
     }
 
-    // Retrieve all transactions for the user
-    const transactions = user.transactions;
+    let transactions = user.transactions;
+
+    // Apply filtering by type and category
+    if (type || category) {
+      transactions = transactions.filter((transaction) => {
+        return (
+          (!type || transaction.type === type) &&
+          (!category || transaction.category === category)
+        );
+      });
+    }
+
+    // Apply sorting
+    if (sort) {
+      switch (sort) {
+        case 'amount_asc':
+          transactions.sort(
+            (a, b) => a.transactionAmount - b.transactionAmount
+          );
+          break;
+        case 'amount_desc':
+          transactions.sort(
+            (a, b) => b.transactionAmount - a.transactionAmount
+          );
+          break;
+        case 'date_asc':
+          transactions.sort((a, b) => new Date(a.date) - new Date(b.date));
+          break;
+        case 'date_desc':
+          transactions.sort((a, b) => new Date(b.date) - new Date(a.date));
+          break;
+        default:
+          break;
+      }
+    }
 
     // Send a success response with the transactions data
     res.status(200).json({
