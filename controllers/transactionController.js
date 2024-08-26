@@ -242,12 +242,44 @@ exports.updateTransaction = async (req, res) => {
       });
     }
 
+    // Reverse the effects of the existing transaction on balance and saving
+    if (transaction.isSavingsTransfer) {
+      if (transaction.type === 'income') {
+        user.currentBalance -= transaction.transactionAmount;
+        user.saving.currentAmount -= transaction.transactionAmount;
+      } else {
+        user.currentBalance += transaction.transactionAmount;
+        user.saving.currentAmount -= transaction.transactionAmount;
+      }
+    } else {
+      user.currentBalance +=
+        transaction.type === 'income'
+          ? -transaction.transactionAmount
+          : transaction.transactionAmount;
+    }
+
     // Update the transaction fields
     if (date) transaction.date = date;
     if (type) transaction.type = type;
     if (category) transaction.category = category;
     if (transactionAmount) transaction.transactionAmount = transactionAmount;
     if (title) transaction.title = title;
+
+    // Apply the new transaction effects to balance and saving
+    if (transaction.isSavingsTransfer) {
+      if (transaction.type === 'income') {
+        user.currentBalance += transaction.transactionAmount;
+        user.saving.currentAmount += transaction.transactionAmount;
+      } else {
+        user.currentBalance -= transaction.transactionAmount;
+        user.saving.currentAmount += transaction.transactionAmount;
+      }
+    } else {
+      user.currentBalance +=
+        transaction.type === 'income'
+          ? transaction.transactionAmount
+          : -transaction.transactionAmount;
+    }
 
     // Save the updated user document
     await user.save();
@@ -277,9 +309,7 @@ exports.deleteTransaction = async (req, res) => {
     // Find the user by ID
     const user = await User.findById(req.user._id);
     if (!user) {
-      return res
-        .status(404)
-        .json({ status: 'fail', message: 'User not found' });
+      return res.status(404).json({ status: 'fail', message: 'User not found' });
     }
 
     // Find the transaction in the user's transactions array
@@ -288,9 +318,31 @@ exports.deleteTransaction = async (req, res) => {
     );
 
     if (transactionIndex === -1) {
-      return res
-        .status(404)
-        .json({ status: 'fail', message: 'Transaction not found' });
+      return res.status(404).json({ status: 'fail', message: 'Transaction not found' });
+    }
+
+    // Get the transaction to be deleted
+    const transactionToDelete = user.transactions[transactionIndex];
+
+    // Adjust the current balance and saving amount based on the transaction type and whether it's a savings transfer
+    if (transactionToDelete.isSavingsTransfer) {
+      if (transactionToDelete.type === 'income') {
+        // Undo an income transfer from savings to current balance
+        user.currentBalance -= transactionToDelete.transactionAmount;
+        user.saving.currentAmount += transactionToDelete.transactionAmount;
+      } else if (transactionToDelete.type === 'expense') {
+        // Undo an expense transfer from current balance to savings
+        user.currentBalance += transactionToDelete.transactionAmount;
+        user.saving.currentAmount -= transactionToDelete.transactionAmount;
+      }
+    } else {
+      if (transactionToDelete.type === 'income') {
+        // Undo an income transaction (add back the amount to current balance)
+        user.currentBalance -= transactionToDelete.transactionAmount;
+      } else if (transactionToDelete.type === 'expense') {
+        // Undo an expense transaction (subtract the amount from current balance)
+        user.currentBalance += transactionToDelete.transactionAmount;
+      }
     }
 
     // Remove the transaction from the user's transactions array
@@ -312,3 +364,5 @@ exports.deleteTransaction = async (req, res) => {
     });
   }
 };
+
+
