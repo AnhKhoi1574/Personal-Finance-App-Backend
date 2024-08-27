@@ -1,26 +1,54 @@
 const express = require('express');
 const router = express.Router();
 const conversationController = require('../controllers/gptController');
+const authController = require('../controllers/authController');
 
-// Existing routes
+// Main chat
 router.get(
-  '/:userId/conversations',
+  '/conversations',
+  authController.protect,
   conversationController.getAllConversations
 );
 router.get(
-  '/:userId/conversations/:conversationId',
-  conversationController.getConversation
-);
-router.post(
-  '/:userId/conversations',
-  conversationController.createConversation
-);
-router.post(
-  '/:userId/conversations/:conversationId/messages',
-  conversationController.addMessage
+  '/conversations/:conversationId',
+  authController.protect,
+  conversationController.getConversationMessages
 );
 
-// New route for sending message to GPT
-router.post('/:userId/sendMessage', conversationController.sendMessageToGpt);
+router.post(
+  '/sendMessages',
+  authController.protect,
+  conversationController.sendMessageToGpt
+);
 
+// The 3 below routes are for small chat dialogs appear on each pages
+router.post(
+  '/suggestion/getPrompts',
+  authController.protect,
+  conversationController.getSuggestionPrompt
+);
 module.exports = router;
+
+router.post(
+  '/suggestion/sendMessage',
+  authController.protect,
+  conversationController.sendSuggestionMessage
+);
+
+router.post(
+  '/suggestion/transition',
+  authController.protect,
+  conversationController.transitionSuggestionPrompt
+)
+
+router.delete(
+  '/suggestion/delete',
+  authController.protect,
+  conversationController.deleteSuggestionPrompt
+)
+
+router.post(
+  '/test',
+  authController.protect,
+  conversationController.test
+)
