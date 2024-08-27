@@ -1,6 +1,18 @@
 # BITS Backend
+## Installation
 
-## GPT API Endpoint
+- Set up RMIT Val FastAPI: https://github.com/Khang5687/revChatVal/tree/fastapi
+
+- Run FastAPI Server locally on port `8000`.
+
+- Install npm dependencies
+
+- Run the server
+```bash
+npx nodemon server.js
+```
+
+## API Usage
 
 ### Load conversation history
 **`GET /api/gpt/conversations`**
