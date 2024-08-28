@@ -93,6 +93,27 @@ exports.getAllConversations = async (req, res) => {
   }
 };
 
+exports.deleteConversation = async (req, res) => {
+  try {
+    const { conversationId } = req.params;
+    const userId = req.user._id;
+
+    const conversation = await Conversation.findOne({
+      _id: conversationId,
+      user: userId,
+    });
+    if (!conversation) {
+      return res.status(404).send('Conversation not found');
+    }
+
+    await Conversation.deleteOne({ _id: conversationId });
+    res.status(200).send('Deleted successfully');
+  } catch (error) {
+    console.error(error);
+    res.status(500).send('Unable to delete conversation');
+  }
+};
+
 exports.getConversationMessages = async (req, res) => {
   try {
     const { conversationId } = req.params;
@@ -116,32 +137,13 @@ exports.getConversationMessages = async (req, res) => {
   }
 };
 
-exports.test = async (req, res) => {
-  try {
-    const userId = req.user._id;
-    if (!userId) return res.status(404).send('User not found');
-
-    const transactions = await getSortedTransactions(
-      userId,
-      '010723',
-      '200823'
-    );
-    res.status(200).json({ transactions });
-  } catch (e) {
-    res.status(500).json({ message: e.message });
-  }
-};
-
-exports.sendMessageToGpt = async (req, res) => {
+exports.sendMainMessage = async (req, res) => {
   try {
     const userId = req.user._id;
     if (!userId) return res.status(404).send('User not found');
     if (!req.body.message) {
       return res.status(400).send('User message not found');
     }
-    // Debugs
-    console.log(userId);
-    console.log(req.body.conversation_id);
 
     let conversation;
     if (req.body.conversation_id) {
@@ -222,16 +224,16 @@ exports.sendMessageToGpt = async (req, res) => {
         conversation.messages[conversation.messages.length - 1], // The last element
       ],
     };
-
     // Send POST request to external GPT service
-    const response = await axios.post(
-      'http://127.0.0.1:8000/api/generate',
-      payload
-    );
-    if (response.status !== 200) {
-      return res
-        .status(500)
-        .send(`Error from FastAPI Service: ${response.statusText}`);
+    let response;
+    try {
+      response = await axios.post(
+        'http://127.0.0.1:8000/api/generate',
+        payload
+      );
+    } catch (error) {
+      // console.error('Error during axios request:', error);
+      return res.status(500).send(`Error from the GPT Service.`);
     }
 
     let message = response.data.content;
@@ -250,7 +252,7 @@ exports.sendMessageToGpt = async (req, res) => {
     const serverResponse = {
       conversationId: conversation.conversationId,
       title: message.title,
-      messages: message.content,
+      content: message.content,
     };
 
     res.status(200).send(serverResponse);
@@ -259,35 +261,127 @@ exports.sendMessageToGpt = async (req, res) => {
     res.status(500).send('Server error');
   }
 };
+
+async function getSuggestionPromptFromGPT(messages) {
+  try {
+    let payload_message = {
+      role: 'user',
+      content:
+        'Send me an array of 4 strings [,,,,], containing follow up questions related to the given text. They ALL must be brief, short, and related to the questions! E.g. What about, How do I, etc...',
+    };
+    // Append the new user message to the payload
+    messages.push(payload_message);
+
+    // Prepare the payload
+    const payload = {
+      settings: {
+        response_length: 'short',
+        temperature: 0.2,
+        system_prompt:
+          'You are a prompt generator, generate 4 follow up questions based on the above text, they all should be brief and succint, and related to the above text. Remember to keep them related to the above text, BUT DO NOT GENERATE PROMPTS THAT IS RELATED TO THE USER PROMPTS (hint: they all are topics about FINANCIAL, MONEY, INVESTING, etc...). E.g. What about, How do I, etc...',
+        precaution:
+          'Remember! Only send me an array of 4 strings contaning follow up questions related to all of the above text (hint: they all are topics about FINANCIAL, MONEY, INVESTING, etc...).',
+      },
+      messages: messages,
+    };
+
+    // Send POST request to external GPT service
+    let response;
+    try {
+      response = await axios.post(
+        'http://127.0.0.1:8000/api/generate',
+        payload
+      );
+    } catch (error) {
+      // console.error('Error during axios request:', error);
+      return res.status(500).send(`Error from the GPT Service.`);
+    }
+
+    let prompts;
+    prompts = response.data.content.content;
+    if (typeof prompts === 'string') {
+      try {
+        prompts = JSON.parse(prompts);
+      } catch (e) {
+        console.error('Error parsing prompts:', e.message); // Debugging line
+        return {
+          status: 'fail',
+          content:
+            'Internal Server Error. Unexpected array format generated, please try generating again.',
+        };
+      }
+    }
+    return {
+      status: 'success',
+      content: prompts,
+    };
+  } catch (error) {
+    console.error(error);
+    return {
+      status: 'fail',
+      content:
+        'Internal Server Error, Unexpected array format, please try requesting again.',
+    };
+  }
+}
+
 exports.getSuggestionPrompt = async (req, res) => {
   try {
     const userId = req.user._id;
     // const user = await User.findById(req.params.userId);
     if (!userId) return res.status(404).send('User not found');
 
-    // Check if small conversation already exists
-    let small_conversation;
-
-    small_conversation = await SmallConversation.findOne({
-      user: userId,
-    });
-
-    if (!small_conversation || small_conversation.messages.length === 0) {
-      // If no small conversation exists, check for params to return an array of 3 prompts
-      if (req.body.type) {
+    // Check for request body for type
+    if (!req.body.type) {
+      return res.status(400).send('Prompt type is required');
+    }
+    if (
+      !['general', 'budget', 'transactions', 'goals'].includes(req.body.type)
+    ) {
+      return res.status(400).send('Invalid prompt type');
+    }
+    let results;
+    // If prompt type is general, check for req.body.conversation_id.
+    // If conversation_id is empty, return hard-coded prompts,
+    // otherwise, return prompts generated by GPT based on the conversation.
+    if (req.body.type === 'general') {
+      if (!req.body.conversation_id || req.body.conversation_id === '') {
+        return res.status(200).json({
+          prompts: [
+            'What are my top three financial goals for the next six months, and how am I progressing towards them?',
+            'How much do I need to save each month to reach my emergency fund target by the end of the year?',
+            'Are my current spending habits aligned with my long-term savings goals, such as buying a house or retirement?',
+            'What are the top three financial goals for the next six months, and how am I progressing towards them?',
+          ],
+        });
+      } else {
+        // Find the conversation for the given user
+        const conversation = await Conversation.findOne({
+          _id: req.body.conversation_id,
+          user: userId,
+        });
+        if (!conversation) {
+          return res.status(404).send('Conversation not found');
+        }
+        results = await getSuggestionPromptFromGPT(conversation.messages);
+      }
+    } else if (['budget', 'transactions', 'goals'].includes(req.body.type)) {
+      // Check if small conversation already exists
+      let small_conversation;
+      small_conversation = await SmallConversation.findOne({
+        user: userId,
+      });
+      if (!small_conversation || small_conversation.messages.length === 0) {
+        // If no small conversation exists, check for params to return an array of 4 prompts
         // Check if prompt Type is either 'budget', 'transactions', or 'goals'
         switch (req.body.type) {
           case 'budget':
             return res.status(200).json({
-              prompts: [
-                "Help me analyze 2023 Bill Gates's budget",
-                'Hoho',
-                'Hehe',
-              ],
+              prompts: ['Help me save the budget.', 'Hoho', 'Hehe', 'Haha'],
             });
           case 'transactions':
             return res.status(200).json({
-              prompts: ['Haha', 'Hoho', 'Hehe'],
+              prompts: ['Haha', 'Hoho', 'Hehe', 'Hihi'],
             });
           case 'goals':
             return res.status(200).json({
@@ -295,66 +389,30 @@ exports.getSuggestionPrompt = async (req, res) => {
                 'What are my top three financial goals for the next six months, and how am I progressing towards them?',
                 'How much do I need to save each month to reach my emergency fund target by the end of the year?',
                 'Are my current spending habits aligned with my long-term savings goals, such as buying a house or retirement?',
+                'What are my top three financial goals for the next six months, and how am I progressing towards them?',
               ],
             });
           default:
             return res.status(400).send('Invalid prompt type');
         }
       }
-    }
-    // If small conversation exists, add the pre-defined prompts to generate array of 3 prompts
-    let newMessage = {
-      role: 'user',
-      content:
-        'Send me an array of 3 strings [,,,], containing follow up questions related to the given text. They ALL must be brief, short, and related to the questions! E.g. What about, How do I, etc...',
-    };
-    small_conversation.messages.push(newMessage);
-    // Prepare the payload
-    const payload = {
-      settings: {
-        response_length: 'short',
-        temperature: 0.1,
-        system_prompt:
-          'You are a prompt generator, generate 3 follow up questions based on the above text, they all should be brief and succint, and related to the above text. Remember to keep them related to the above text, BUT DO NOT GENERATE PROMPTS THAT IS RELATED TO THE USER PROMPTS (hint: they all are topics about FINANCIAL, MONEY, INVESTING, etc...). E.g. What about, How do I, etc...',
-        precaution:
-          'Remember! Only send me an array of 3 strings contaning follow up questions related to all of the above text (hint: they all are topics about FINANCIAL, MONEY, INVESTING, etc...).',
-      },
-      messages: [...small_conversation.messages],
-    };
 
-    // Send POST request to external GPT service
-    const response = await axios.post(
-      'http://127.0.0.1:8000/api/generate',
-      payload
-    );
-    if (response.status !== 200) {
+      // If small conversation exists, generate an array of 4 prompts based on small conversation messages
+      results = await getSuggestionPromptFromGPT(small_conversation.messages);
+    }
+
+    // Check if the results are successful
+    if (results.status === 'fail') {
+      return res.status(500).send(results.content);
+    }
+
+    // Return the prompts
+    const prompts = results.content;
+    if (!prompts || prompts.length === 0) {
       return res
         .status(500)
-        .send(`Error from FastAPI Service: ${response.statusText}`);
+        .send('Unable to generate prompts, please try  generating again.');
     }
-
-    prompts = response.data.content.content;
-    console.log(prompts + '\n');
-    if (typeof prompts === 'string') {
-      try {
-        prompts = JSON.parse(prompts);
-      } catch (e) {
-        return res
-          .status(500)
-          .send(
-            'Internal Server Error, Unexpected array format, please try requesting again.'
-          );
-      }
-    }
-
-    if (!Array.isArray(prompts)) {
-      return res
-        .status(500)
-        .send(
-          'Internal Server Error, Unexpected array format, please try requesting again.'
-        );
-    }
-    console.log(prompts);
     serverResponse = {
       prompts: prompts,
     };
@@ -365,7 +423,37 @@ exports.getSuggestionPrompt = async (req, res) => {
   }
 };
 
-exports.sendSuggestionMessage = async (req, res) => {
+// Small chat
+exports.getSmallMessages = async (req, res) => {
+  try {
+    const userId = req.user._id;
+    // const
+    if (!userId) return res.status(404).send('User not found');
+
+    // Check if small conversation already exists
+    let small_conversation;
+    small_conversation = await SmallConversation.findOne({
+      user: userId,
+    });
+
+    if (!small_conversation) {
+      // Create a new small conversation
+      small_conversation = new SmallConversation({
+        user: userId,
+        messages: [],
+        createdAt: new Date(),
+      });
+      return res.status(200).send([]);
+    } else {
+      return res.status(200).send(small_conversation.messages);
+    }
+  } catch (error) {
+    console.error(error);
+    res.status(500).send('Server error');
+  }
+};
+
+exports.sendSmallMessage = async (req, res) => {
   try {
     const userId = req.user._id;
     if (!userId) return res.status(404).send('User not found');
@@ -408,14 +496,15 @@ exports.sendSuggestionMessage = async (req, res) => {
     };
 
     // Send POST request to external GPT service
-    const response = await axios.post(
-      'http://127.0.0.1:8000/api/generate',
-      payload
-    );
-    if (response.status !== 200) {
-      return res
-        .status(500)
-        .send(`Error from FastAPI Service: ${response.statusText}`);
+    let response;
+    try {
+      response = await axios.post(
+        'http://127.0.0.1:8000/api/generate',
+        payload
+      );
+    } catch (error) {
+      // console.error('Error during axios request:', error);
+      return res.status(500).send(`Error from the GPT Service.`);
     }
 
     // Update the title
@@ -435,7 +524,7 @@ exports.sendSuggestionMessage = async (req, res) => {
     await small_conversation.save();
 
     serverResponse = {
-      messages: message.title,
+      content: message.content,
     };
     res.status(200).send(serverResponse);
   } catch (error) {
@@ -444,7 +533,7 @@ exports.sendSuggestionMessage = async (req, res) => {
   }
 };
 
-exports.transitionSuggestionPrompt = async (req, res) => {
+exports.transitSmallConversation = async (req, res) => {
   try {
     // Find the small conversation for the given user
     const userId = req.user._id;
@@ -455,7 +544,7 @@ exports.transitionSuggestionPrompt = async (req, res) => {
       user: userId,
     });
     if (!small_conversation) {
-      throw new Error('Small conversation not found for the user');
+      return res.status(404).send('Small conversation not found for the user');
     }
 
     // Create a new conversation using the data from the small conversation
@@ -489,7 +578,7 @@ exports.transitionSuggestionPrompt = async (req, res) => {
   }
 };
 
-exports.deleteSuggestionPrompt = async (req, res) => {
+exports.deleteSmallConversation = async (req, res) => {
   try {
     // Find the small conversation for the given user
     const userId = req.user._id;
