@@ -9,46 +9,44 @@ router.get(
   authController.protect,
   conversationController.getAllConversations
 );
-router.get(
-  '/conversations/:conversationId',
-  authController.protect,
-  conversationController.getConversationMessages
-);
+
+router
+  .route('/conversations/:conversationId')
+  .get(authController.protect, conversationController.getConversationMessages)
+  .delete(authController.protect, conversationController.deleteConversation);
 
 router.post(
-  '/sendMessages',
+  '/generate',
   authController.protect,
-  conversationController.sendMessageToGpt
+  conversationController.sendMainMessage
 );
 
-// The 3 below routes are for small chat dialogs appear on each pages
+// Generate an array of 4 prompts
 router.post(
-  '/suggestion/getPrompts',
+  '/getPrompts',
   authController.protect,
   conversationController.getSuggestionPrompt
 );
-module.exports = router;
+
+// Small chat
+router
+  .route('/small')
+  .get(authController.protect, conversationController.getSmallMessages)
+  .delete(
+    authController.protect,
+    conversationController.deleteSmallConversation
+  );
 
 router.post(
-  '/suggestion/sendMessage',
+  '/small/generate',
   authController.protect,
-  conversationController.sendSuggestionMessage
+  conversationController.sendSmallMessage
 );
 
 router.post(
-  '/suggestion/transition',
+  '/small/transit',
   authController.protect,
-  conversationController.transitionSuggestionPrompt
-)
+  conversationController.transitSmallConversation
+);
 
-router.delete(
-  '/suggestion/delete',
-  authController.protect,
-  conversationController.deleteSuggestionPrompt
-)
-
-router.post(
-  '/test',
-  authController.protect,
-  conversationController.test
-)
+module.exports = router;
