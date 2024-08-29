@@ -3,6 +3,7 @@ const Joi = require('joi');
 const mongoose = require('mongoose');
 const { transactionSchema } = require('./transactionModel');
 const { savingSchema } = require('./savingModel');
+const { budgetSchema } = require('./budgetModel');
 
 // User schema
 const userSchema = new mongoose.Schema(
@@ -39,6 +40,7 @@ const userSchema = new mongoose.Schema(
     },
     transactions: [transactionSchema],
     saving: savingSchema,
+    budget: budgetSchema, 
     prompts: [
       {
         type: mongoose.Schema.Types.ObjectId,

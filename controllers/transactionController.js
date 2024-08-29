@@ -28,22 +28,10 @@ exports.createTransaction = async (req, res) => {
     // Find the user by ID and populate saving data
     const user = await User.findById(userId).populate('saving');
     if (!user) {
-      return res
-        .status(404)
-        .json({ status: 'error', message: 'User not found' });
+      return res.status(404).json({ status: 'error', message: 'User not found' });
     }
 
     let actualTransactionAmount = transactionAmount;
-
-    // Create the transaction
-    const newTransaction = new Transaction({
-      date,
-      type,
-      category,
-      transactionAmount,
-      title,
-      isSavingsTransfer: false,
-    });
 
     // Handle automatic savings if the transaction is of type 'income'
     if (
@@ -52,8 +40,27 @@ exports.createTransaction = async (req, res) => {
       user.saving.isAutoSavingEnabled &&
       user.saving.autoSavingPercentage > 0
     ) {
+      // Check if the savings goal has been reached
+      if (user.saving.currentAmount >= user.saving.targetAmount) {
+        return res.status(400).json({
+          status: 'error',
+          message: 'Target amount reached. Please increase the target amount or delete the saving goal.',
+        });
+      }
+
       const savingAmount =
         (transactionAmount * user.saving.autoSavingPercentage) / 100;
+
+      // Calculate the new saving amount after adding
+      const newSavingAmount = user.saving.currentAmount + savingAmount;
+
+      // Ensure the new saving amount does not exceed the target amount
+      if (newSavingAmount > user.saving.targetAmount) {
+        return res.status(400).json({
+          status: 'error',
+          message: `Automatic saving would exceed the target amount. Please adjust your settings.`,
+        });
+      }
 
       user.saving.currentAmount += savingAmount;
       actualTransactionAmount -= savingAmount;
@@ -70,14 +77,28 @@ exports.createTransaction = async (req, res) => {
 
       // Add the savings transaction to the user's transactions
       user.transactions.push(savingTransaction);
+
+      // Adjust the budget if the budget exists and the category is 'saving'
+      if (user.budget && user.budget.categories.saving) {
+        user.budget.categories.saving.spent += savingAmount;
+      }
     }
+
+    // Create the transaction
+    const newTransaction = new Transaction({
+      date,
+      type,
+      category,
+      transactionAmount,
+      title,
+      isSavingsTransfer: false,
+    });
 
     // Add the new transaction to the user's transactions
     user.transactions.push(newTransaction);
 
     // Update the user's current balance
-    user.currentBalance +=
-      type === 'income' ? actualTransactionAmount : -transactionAmount;
+    user.currentBalance += type === 'income' ? actualTransactionAmount : -transactionAmount;
 
     // Save the updated user document
     await user.save();
@@ -258,6 +279,19 @@ exports.updateTransaction = async (req, res) => {
           : transaction.transactionAmount;
     }
 
+    // If updating to an income transaction with a savings transfer, check if it would exceed the target amount
+    if (
+      type === 'income' &&
+      transaction.isSavingsTransfer &&
+      user.saving &&
+      user.saving.currentAmount + transactionAmount > user.saving.targetAmount
+    ) {
+      return res.status(400).json({
+        status: 'error',
+        message: 'Updating this transaction would exceed the savings target amount. Please adjust the amount or the target amount.',
+      });
+    }
+
     // Update the transaction fields
     if (date) transaction.date = date;
     if (type) transaction.type = type;
@@ -292,7 +326,6 @@ exports.updateTransaction = async (req, res) => {
       },
     });
   } catch (err) {
-    // Handle any errors during the process
     res.status(500).json({
       status: 'error',
       message: 'An error occurred while updating the transaction',
@@ -300,7 +333,7 @@ exports.updateTransaction = async (req, res) => {
   }
 };
 
-// Delete transaction
+// Delete transaction (with Budget Integration)
 exports.deleteTransaction = async (req, res) => {
   try {
     // Extract user ID and transaction ID from the request parameters
@@ -335,6 +368,9 @@ exports.deleteTransaction = async (req, res) => {
         user.currentBalance += transactionToDelete.transactionAmount;
         user.saving.currentAmount -= transactionToDelete.transactionAmount;
       }
+      if (user.budget && user.budget.categories.saving) {
+        user.budget.categories.saving.spent -= transactionToDelete.transactionAmount;
+      }
     } else {
       if (transactionToDelete.type === 'income') {
         // Undo an income transaction (add back the amount to current balance)
@@ -342,6 +378,11 @@ exports.deleteTransaction = async (req, res) => {
       } else if (transactionToDelete.type === 'expense') {
         // Undo an expense transaction (subtract the amount from current balance)
         user.currentBalance += transactionToDelete.transactionAmount;
+
+        // Adjust the budget if it's an expense transaction
+        if (user.budget && user.budget.categories[transactionToDelete.category]) {
+          user.budget.categories[transactionToDelete.category].spent -= transactionToDelete.transactionAmount;
+        }
       }
     }
 
@@ -357,7 +398,6 @@ exports.deleteTransaction = async (req, res) => {
       message: 'Transaction deleted successfully',
     });
   } catch (err) {
-    // Handle any errors during the process
     res.status(500).json({
       status: 'error',
       message: 'An error occurred while deleting the transaction',

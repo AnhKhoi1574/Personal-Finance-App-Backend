@@ -214,6 +214,14 @@ exports.addMoneyToSaving = async (req, res) => {
       });
     }
 
+    // Check if the savings goal has been reached
+    if (user.saving.currentAmount >= user.saving.targetAmount) {
+      return res.status(400).json({
+        status: 'error',
+        message: 'Target amount reached. Please increase the target amount or delete the saving goal.',
+      });
+    }
+
     // Check if user has enough balance
     if (user.currentBalance < amount) {
       return res.status(400).json({
@@ -222,12 +230,24 @@ exports.addMoneyToSaving = async (req, res) => {
       });
     }
 
+    // Calculate the new saving amount after adding
+    const newSavingAmount = user.saving.currentAmount + amount;
+
+    // Ensure the new saving amount does not exceed the target amount
+    if (newSavingAmount > user.saving.targetAmount) {
+      return res.status(400).json({
+        status: 'error',
+        message: `Cannot add ${amount}. It would exceed the target amount. You can only add up to ${user.saving.targetAmount - user.saving.currentAmount}.`,
+      });
+    }
+
     // Deduct amount from current balance
     user.currentBalance -= amount;
 
     // Add amount to the saving's current amount
-    user.saving.currentAmount += amount;
+    user.saving.currentAmount = newSavingAmount;
 
+    // Create a transaction for the saving transfer
     const addMoneyTransaction = {
       type: 'expense',
       category: 'saving',
@@ -235,7 +255,6 @@ exports.addMoneyToSaving = async (req, res) => {
       date: new Date(),
       isSavingsTransfer: true,
     };
-    // Create a transaction for the saving transfer
     user.transactions.push(addMoneyTransaction);
 
     // Save the updated user document
