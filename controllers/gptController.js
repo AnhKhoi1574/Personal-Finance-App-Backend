@@ -107,10 +107,10 @@ exports.deleteConversation = async (req, res) => {
     }
 
     await Conversation.deleteOne({ _id: conversationId });
-    res.status(200).send('Deleted successfully');
+    res.status(200).json({success: 'Deleted successfully'});
   } catch (error) {
     console.error(error);
-    res.status(500).send('Unable to delete conversation');
+    res.status(500).json({error: 'Unable to delete conversation'});
   }
 };
 
@@ -144,7 +144,7 @@ exports.sendMainMessage = async (req, res) => {
     if (!req.body.message) {
       return res.status(400).send('User message not found');
     }
-
+    console.log('User message:', req.body.message);
     let conversation;
     if (req.body.conversation_id) {
       conversation = await Conversation.findOne({
@@ -233,7 +233,7 @@ exports.sendMainMessage = async (req, res) => {
       );
     } catch (error) {
       // console.error('Error during axios request:', error);
-      return res.status(500).send(`Error from the GPT Service.`);
+      return res.status(500).json({error: `Error from the GPT Service.`});
     }
 
     let message = response.data.content;
@@ -258,7 +258,7 @@ exports.sendMainMessage = async (req, res) => {
     res.status(200).send(serverResponse);
   } catch (error) {
     console.error(error);
-    res.status(500).send('Server error');
+    res.status(500).json({error: 'Server error'});
   }
 };
 
@@ -294,7 +294,7 @@ async function getSuggestionPromptFromGPT(messages) {
       );
     } catch (error) {
       // console.error('Error during axios request:', error);
-      return res.status(500).send(`Error from the GPT Service.`);
+      return res.status(500).json({error: `Error from the GPT Service.`});
     }
 
     let prompts;
@@ -317,10 +317,7 @@ async function getSuggestionPromptFromGPT(messages) {
     };
   } catch (error) {
     console.error(error);
-    return {
-      status: 'fail',
-      content:
-        'Internal Server Error, Unexpected array format, please try requesting again.',
+    return {error:'Internal Server Error, Unexpected array format, please try requesting again.',
     };
   }
 }
@@ -419,7 +416,7 @@ exports.getSuggestionPrompt = async (req, res) => {
     res.status(200).send(serverResponse);
   } catch (error) {
     console.error(error);
-    res.status(500).send('Server error');
+    res.status(500).json({error: 'Server error'});
   }
 };
 
@@ -449,7 +446,7 @@ exports.getSmallMessages = async (req, res) => {
     }
   } catch (error) {
     console.error(error);
-    res.status(500).send('Server error');
+    res.status(500).json({error: 'Server error'});
   }
 };
 
@@ -604,6 +601,6 @@ exports.deleteSmallConversation = async (req, res) => {
         .status(404)
         .send('Small conversation not found, could be already deleted?');
     }
-    res.status(500).send('Could not delete');
+    res.status(500).json({error: 'Could not delete'});
   }
 };
