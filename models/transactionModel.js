@@ -13,13 +13,21 @@ const transactionSchema = new mongoose.Schema({
     enum: ['income', 'expense'],
     required: true,
     trim: true,
+    lowercase: true,
   },
   category: {
     type: String,
-    required: true,
-    minlength: 3,
-    maxlength: 50,
+    // enum: [
+    //   'household',
+    //   'shopping',
+    //   'food',
+    //   'utilities',
+    //   'transportation',
+    //    'saving'
+    //   'others',
+    // ],
     trim: true,
+    lowercase: true,
   },
   transactionAmount: {
     type: Number,
@@ -32,6 +40,7 @@ const transactionSchema = new mongoose.Schema({
     maxlength: 50,
     trim: true,
   },
+  isSavingsTransfer: { type: Boolean, default: false }, // check if it is a transfer related to saving amount
 });
 
 // Transaction model
@@ -42,7 +51,7 @@ function validateTransaction(transaction) {
   const schema = Joi.object({
     date: Joi.date().required(),
     type: Joi.string().valid('income', 'expense').required(),
-    category: Joi.string().min(3).max(50).required(),
+    category: Joi.string().min(3).max(50),
     transactionAmount: Joi.number().min(0).required(),
     title: Joi.string().min(3).max(50),
   });
