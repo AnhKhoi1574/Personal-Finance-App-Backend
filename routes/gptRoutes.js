@@ -13,6 +13,7 @@ router.get(
 router
   .route('/conversations/:conversationId')
   .get(authController.protect, conversationController.getConversationMessages)
+  .put(authController.protect, conversationController.updateConversationSettings)
   .delete(authController.protect, conversationController.deleteConversation);
 
 router.post(
