@@ -137,6 +137,48 @@ exports.getConversationMessages = async (req, res) => {
   }
 };
 
+exports.updateConversationSettings = async (req, res) => {
+  try {
+    const { conversationId } = req.params;
+    const { settings } = req.body;
+
+    // Validate settings
+    const validResponseLengths = ['short', 'medium', 'long'];
+    if (!validResponseLengths.includes(settings.response_length)) {
+      return res.status(400).json({ error: 'Invalid response length' });
+    }
+
+    if (
+      typeof settings.temperature !== 'number' ||
+      settings.temperature < 0 ||
+      settings.temperature > 1 ||
+      !/^-?\d+(\.\d{1})?$/.test(settings.temperature)
+    ) {
+      return res.status(400).json({
+        error:
+          'Invalid temperature. Only one decimal place is allowed and it must be between 0 and 1.',
+      });
+    }
+
+    const conversation = await Conversation.findByIdAndUpdate(
+      conversationId,
+      { settings },
+      { new: true }
+    ).exec();
+
+    if (!conversation) {
+      return res.status(404).json({ error: 'Conversation not found' });
+    }
+
+    res.json({
+      success: 'Settings updated successfully',
+    });
+  } catch (error) {
+    console.log(error);
+    res.status(500).json({ error: 'Could not update settings' });
+  }
+};
+
 exports.sendMainMessage = async (req, res) => {
   try {
     const userId = req.user._id;
