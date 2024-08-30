@@ -184,11 +184,12 @@ exports.sendMainMessage = async (req, res) => {
     const userId = req.user._id;
     if (!userId) return res.status(404).json({ error: 'User not found' });
 
+    let userMessage = req.body.messages;
     // Check if received message is valid
-    const isValidMessage = (message) => {
+    const isValidMessage = (messages) => {
       return (
-        Array.isArray(message) &&
-        message.every((item) => {
+        Array.isArray(messages) &&
+        messages.every((item) => {
           return (
             typeof item === 'object' &&
             (item.role === 'user' || item.role === 'assistant') &&
@@ -197,23 +198,20 @@ exports.sendMainMessage = async (req, res) => {
         })
       );
     };
-
-    if (!req.body.message || !isValidMessage(req.body.message)) {
+    // console.log(userMessage);
+    if (!userMessage || !isValidMessage(userMessage)) {
       return res.status(400).json({
         error: 'Invalid message payload received.',
       });
     }
 
     // Check if the last item in the array has a role of 'user'
-    let lastMessage = req.body.message[req.body.message.length - 1];
+    let lastMessage = userMessage[userMessage.length - 1];
     if (lastMessage.role !== 'user') {
       return res.status(400).json({
         error: "User's message not found",
       });
     }
-
-    console.log('User message:', req.body.message);
-    let userMessage = req.body.message;
 
     let conversation;
     if (req.body.conversation_id) {
@@ -236,8 +234,8 @@ exports.sendMainMessage = async (req, res) => {
         createdAt: new Date(),
       });
     }
-    // Append the new user message to the conversation
-    const newMessage = { role: 'user', content: req.body.message };
+    // Append the new user message to the conversation, which is the last element in the array
+    const newMessage = { role: 'user', content: userMessage[userMessage.length - 1].content};
     conversation.messages.push(newMessage);
 
     // Check if user requested a range of date
@@ -300,11 +298,9 @@ exports.sendMainMessage = async (req, res) => {
     } catch (error) {
       return res.status(500).json({ error: `Error from the GPT Service.` });
     }
-
-    let message = response.data.content;
+    let message = response.data.content;  
     const conversationTitle = message.title;
     conversation.title = conversationTitle;
-
     const assistantMessage = {
       role: message.role,
       content: message.content,
@@ -322,7 +318,7 @@ exports.sendMainMessage = async (req, res) => {
 
     res.status(200).send(serverResponse);
   } catch (error) {
-    console.error(error);
+    console.error(error.message);
     res.status(500).json({ error: 'Server error' });
   }
 };

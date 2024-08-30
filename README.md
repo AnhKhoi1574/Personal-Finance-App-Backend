@@ -103,7 +103,7 @@ This will also save the user's and AI's messages to the main conversations.
 {
         "conversation_id": "66cdabbe38a3dba6310f5dcb",
 
-        "message": [
+        "messages": [
         {
             "role": "user",
             "content": "Analyze my July Spendings"
