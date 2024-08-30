@@ -207,10 +207,16 @@ Transition small chat dialog to main AI chat page, which also **DELETES** the sm
 
 **`POST /api/gpt/small/transit`**
 
-**Sample Response**
+**Response**
 
 ```python
-"Sent to main AI chat"
+{"success": "Sent to main AI chat"}
+```
+
+or
+
+```python
+{"error": "Could not send to main AI chat"}
 ```
 
 ### Delete small conversation
@@ -219,8 +225,14 @@ Manually **delete** the small chat
 
 **`DELETE /api/gpt/small`**
 
-**Sample Response**
+**Response**
 
 ```python
-"Deleted small conversation successfully"
+{"success": "Deleted successfully"}
+```
+
+or
+
+```python
+{"error": "Delete failed"}
 ```

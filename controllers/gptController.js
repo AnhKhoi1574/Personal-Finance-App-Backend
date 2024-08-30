@@ -168,7 +168,7 @@ exports.sendMainMessage = async (req, res) => {
         error: "User's message not found",
       });
     };
-    
+
     console.log('User message:', req.body.message);
     let userMessage = req.body.message;
 
@@ -565,7 +565,7 @@ exports.transitSmallConversation = async (req, res) => {
       user: userId,
     });
     if (!small_conversation) {
-      return res.status(404).send('Small conversation not found for the user');
+      return res.status(404).json({error: 'Small conversation not found for the user'});
     }
 
     // Create a new conversation using the data from the small conversation
@@ -587,15 +587,15 @@ exports.transitSmallConversation = async (req, res) => {
     await SmallConversation.deleteOne({ _id: small_conversation._id });
 
     console.log('Transitioned to main AI chat successfully');
-    res.status(200).send('Sent to main AI chat');
+    res.status(200).json({success: 'Sent to main AI chat'});
   } catch (error) {
     console.error(error);
     if (error.message === 'Small conversation not found for the user') {
       return res
         .status(404)
-        .send('Small conversation not found, could be already deleted?');
+        .json({error: 'Small conversation not found, could be already deleted?'});
     }
-    res.status(500).send('Could not send to main AI chat');
+    res.status(500).json({error: 'Could not send to main AI chat'});
   }
 };
 
@@ -617,7 +617,7 @@ exports.deleteSmallConversation = async (req, res) => {
     await SmallConversation.deleteOne({ _id: small_conversation._id });
 
     console.log('Deleted small conversation successfully');
-    res.status(200).send('Deleted successfully');
+    res.status(200).json({success: 'Deleted successfully'});
   } catch (error) {
     console.error(error);
     if (error.message === 'Small conversation not found for the user') {
@@ -625,6 +625,6 @@ exports.deleteSmallConversation = async (req, res) => {
         error: 'Small conversation not found, could be already deleted?',
       });
     }
-    res.status(500).json({ error: 'Could not delete' });
+    res.status(500).json({ error: 'Delete failed' });
   }
 };
