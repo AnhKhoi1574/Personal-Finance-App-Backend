@@ -102,11 +102,25 @@ This will also save the user's and AI's messages to the main conversations.
 ```python
 {
         "conversation_id": "66cdabbe38a3dba6310f5dcb",
-        "message": "Analyze my July spendings,
+
+        "message": [
+        {
+            "role": "user",
+            "content": "Analyze my July Spendings"
+        },
+        {
+            "role": "assistant",
+            "content": "Sure, let's break down your July spendings...",
+        },
+            "role": "user",
+            "content": "Great! now..."
+        ],
+
         "settings": {
             "temperature": float (from 0.1 to 1.0),
             "response_length": string ("short", "medium", "long"),
         },
+
         "transaction_start_date": string (ddmmyy) e.g. 180223,
         "transaction_end_date": string (ddmmyy),
 }

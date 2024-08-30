@@ -103,14 +103,14 @@ exports.deleteConversation = async (req, res) => {
       user: userId,
     });
     if (!conversation) {
-      return res.status(404).send('Conversation not found');
+      return res.status(404).json({ error: 'Conversation not found' });
     }
 
     await Conversation.deleteOne({ _id: conversationId });
-    res.status(200).json({success: 'Deleted successfully'});
+    res.status(200).json({ success: 'Deleted successfully' });
   } catch (error) {
     console.error(error);
-    res.status(500).json({error: 'Unable to delete conversation'});
+    res.status(500).json({ error: 'Unable to delete conversation' });
   }
 };
 
@@ -136,22 +136,50 @@ exports.getConversationMessages = async (req, res) => {
     res.status(500).json({ message: error.message });
   }
 };
-
 exports.sendMainMessage = async (req, res) => {
   try {
     const userId = req.user._id;
-    if (!userId) return res.status(404).send('User not found');
-    if (!req.body.message) {
-      return res.status(400).send('User message not found');
+    if (!userId) return res.status(404).json({ error: 'User not found' });
+
+    // Check if received message is valid
+    const isValidMessage = (message) => {
+      return (
+        Array.isArray(message) &&
+        message.every((item) => {
+          return (
+            typeof item === 'object' &&
+            (item.role === 'user' || item.role === 'assistant') &&
+            typeof item.content === 'string'
+          );
+        })
+      );
+    };
+
+    if (!req.body.message || !isValidMessage(req.body.message)) {
+      return res.status(400).json({
+        error: 'Invalid message payload received.',
+      });
     }
+
+    // Check if the last item in the array has a role of 'user'
+    let lastMessage = req.body.message[req.body.message.length - 1];
+    if (lastMessage.role !== 'user') {
+      return res.status(400).json({
+        error: "User's message not found",
+      });
+    };
+    
     console.log('User message:', req.body.message);
+    let userMessage = req.body.message;
+
     let conversation;
     if (req.body.conversation_id) {
       conversation = await Conversation.findOne({
         _id: req.body.conversation_id,
         user: userId,
       });
-      if (!conversation) return res.status(404).send('Conversation not found');
+      if (!conversation)
+        return res.status(404).json({ error: 'Conversation not found' });
     } else {
       // Create a new conversation if conversation_id is null or empty
       conversation = new Conversation({
@@ -177,7 +205,6 @@ exports.sendMainMessage = async (req, res) => {
         if (!transactionStartDate || !/^\d{6}$/.test(transactionStartDate)) {
           throw new Error('Invalid transaction start date format');
         }
-        // startDate = parseDate(transactionStartDate);
         startDate = transactionStartDate;
       }
       if (req.body.transaction_end_date) {
@@ -195,11 +222,10 @@ exports.sendMainMessage = async (req, res) => {
     }
 
     // Temporary message to include user's transactions as CSV string, so that GPT can understand user's financial data
-
     let transactionData = {
       role: 'user',
       content:
-        'This is my transaction data in CSV format' +
+        'IGNORE PREVIOUS TRANSACTIONS. This is my UPDATED transaction data in CSV format' +
         (await getSortedTransactions(userId, startDate, endDate)),
     };
 
@@ -219,21 +245,17 @@ exports.sendMainMessage = async (req, res) => {
           'REMEMBER: DO NOT ANSWER IF IT IS NOT RELATED TO MONEY, FINANCE, INVESTMENT, BANKING, OR ANYTHING RELATED, questions that are considered follow up to the above are allowed',
       },
       messages: [
-        ...conversation.messages.slice(0, -1), // All elements except the last one
+        ...userMessage.slice(0, -1), // All elements except the last one
         transactionData, // The transaction data to inject
-        conversation.messages[conversation.messages.length - 1], // The last element
+        userMessage[userMessage.length - 1], // The last element
       ],
     };
     // Send POST request to external GPT service
     let response;
     try {
-      response = await axios.post(
-        'http://127.0.0.1:8000/api/generate',
-        payload
-      );
+      response = await axios.post('http://127.0.0.1:8000/api/test', payload);
     } catch (error) {
-      // console.error('Error during axios request:', error);
-      return res.status(500).json({error: `Error from the GPT Service.`});
+      return res.status(500).json({ error: `Error from the GPT Service.` });
     }
 
     let message = response.data.content;
@@ -258,7 +280,7 @@ exports.sendMainMessage = async (req, res) => {
     res.status(200).send(serverResponse);
   } catch (error) {
     console.error(error);
-    res.status(500).json({error: 'Server error'});
+    res.status(500).json({ error: 'Server error' });
   }
 };
 
@@ -294,7 +316,7 @@ async function getSuggestionPromptFromGPT(messages) {
       );
     } catch (error) {
       // console.error('Error during axios request:', error);
-      return res.status(500).json({error: `Error from the GPT Service.`});
+      return res.status(500).json({ error: `Error from the GPT Service.` });
     }
 
     let prompts;
@@ -317,7 +339,9 @@ async function getSuggestionPromptFromGPT(messages) {
     };
   } catch (error) {
     console.error(error);
-    return {error:'Internal Server Error, Unexpected array format, please try requesting again.',
+    return {
+      error:
+        'Internal Server Error, Unexpected array format, please try requesting again.',
     };
   }
 }
@@ -326,16 +350,16 @@ exports.getSuggestionPrompt = async (req, res) => {
   try {
     const userId = req.user._id;
     // const user = await User.findById(req.params.userId);
-    if (!userId) return res.status(404).send('User not found');
+    if (!userId) return res.status(404).json({ error: 'User not found' });
 
     // Check for request body for type
     if (!req.body.type) {
-      return res.status(400).send('Prompt type is required');
+      return res.status(400).json({ error: 'Prompt type is required' });
     }
     if (
       !['general', 'budget', 'transactions', 'goals'].includes(req.body.type)
     ) {
-      return res.status(400).send('Invalid prompt type');
+      return res.status(400).json({ error: 'Invalid prompt type' });
     }
     let results;
     // If prompt type is general, check for req.body.conversation_id.
@@ -358,7 +382,7 @@ exports.getSuggestionPrompt = async (req, res) => {
           user: userId,
         });
         if (!conversation) {
-          return res.status(404).send('Conversation not found');
+          return res.status(404).json({ error: 'Conversation not found' });
         }
         results = await getSuggestionPromptFromGPT(conversation.messages);
       }
@@ -390,7 +414,7 @@ exports.getSuggestionPrompt = async (req, res) => {
               ],
             });
           default:
-            return res.status(400).send('Invalid prompt type');
+            return res.status(400).json({ error: 'Invalid prompt type' });
         }
       }
 
@@ -400,15 +424,15 @@ exports.getSuggestionPrompt = async (req, res) => {
 
     // Check if the results are successful
     if (results.status === 'fail') {
-      return res.status(500).send(results.content);
+      return res.status(500).json({ error: results.content });
     }
 
     // Return the prompts
     const prompts = results.content;
     if (!prompts || prompts.length === 0) {
-      return res
-        .status(500)
-        .send('Unable to generate prompts, please try  generating again.');
+      return res.status(500).json({
+        error: 'Unable to generate prompts, please try  generating again.',
+      });
     }
     serverResponse = {
       prompts: prompts,
@@ -416,7 +440,7 @@ exports.getSuggestionPrompt = async (req, res) => {
     res.status(200).send(serverResponse);
   } catch (error) {
     console.error(error);
-    res.status(500).json({error: 'Server error'});
+    res.status(500).json({ error: 'Server error' });
   }
 };
 
@@ -425,7 +449,7 @@ exports.getSmallMessages = async (req, res) => {
   try {
     const userId = req.user._id;
     // const
-    if (!userId) return res.status(404).send('User not found');
+    if (!userId) return res.status(404).json({ error: 'User not found' });
 
     // Check if small conversation already exists
     let small_conversation;
@@ -446,18 +470,18 @@ exports.getSmallMessages = async (req, res) => {
     }
   } catch (error) {
     console.error(error);
-    res.status(500).json({error: 'Server error'});
+    res.status(500).json({ error: 'Server error' });
   }
 };
 
 exports.sendSmallMessage = async (req, res) => {
   try {
     const userId = req.user._id;
-    if (!userId) return res.status(404).send('User not found');
+    if (!userId) return res.status(404).json({ error: 'User not found' });
 
     // Check for request body if it includes the prompt key.
     if (!req.body.prompt) {
-      return res.status(400).send('Prompt is required');
+      return res.status(400).json({ error: 'Prompt is required' });
     }
 
     // Check if small conversation already exists
@@ -501,7 +525,7 @@ exports.sendSmallMessage = async (req, res) => {
       );
     } catch (error) {
       // console.error('Error during axios request:', error);
-      return res.status(500).send(`Error from the GPT Service.`);
+      return res.status(500).json({ error: `Error from the GPT Service.` });
     }
 
     // Update the title
@@ -526,7 +550,7 @@ exports.sendSmallMessage = async (req, res) => {
     res.status(200).send(serverResponse);
   } catch (error) {
     console.error(error);
-    res.status(500).send('Server error');
+    res.status(500).json({ error: 'Server error' });
   }
 };
 
@@ -535,7 +559,7 @@ exports.transitSmallConversation = async (req, res) => {
     // Find the small conversation for the given user
     const userId = req.user._id;
     // const user = await User.findById(req.params.userId);
-    if (!userId) return res.status(404).send('User not found');
+    if (!userId) return res.status(404).json({ error: 'User not found' });
 
     const small_conversation = await SmallConversation.findOne({
       user: userId,
@@ -580,7 +604,7 @@ exports.deleteSmallConversation = async (req, res) => {
     // Find the small conversation for the given user
     const userId = req.user._id;
     // const user = await User.findById(req.params.userId);
-    if (!userId) return res.status(404).send('User not found');
+    if (!userId) return res.status(404).json({ error: 'User not found' });
 
     const small_conversation = await SmallConversation.findOne({
       user: userId,
@@ -597,10 +621,10 @@ exports.deleteSmallConversation = async (req, res) => {
   } catch (error) {
     console.error(error);
     if (error.message === 'Small conversation not found for the user') {
-      return res
-        .status(404)
-        .send('Small conversation not found, could be already deleted?');
+      return res.status(404).json({
+        error: 'Small conversation not found, could be already deleted?',
+      });
     }
-    res.status(500).json({error: 'Could not delete'});
+    res.status(500).json({ error: 'Could not delete' });
   }
 };
