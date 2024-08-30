@@ -102,11 +102,25 @@ This will also save the user's and AI's messages to the main conversations.
 ```python
 {
         "conversation_id": "66cdabbe38a3dba6310f5dcb",
-        "message": "Analyze my July spendings,
+
+        "messages": [
+        {
+            "role": "user",
+            "content": "Analyze my July Spendings"
+        },
+        {
+            "role": "assistant",
+            "content": "Sure, let's break down your July spendings...",
+        },
+            "role": "user",
+            "content": "Great! now..."
+        ],
+
         "settings": {
             "temperature": float (from 0.1 to 1.0),
             "response_length": string ("short", "medium", "long"),
         },
+
         "transaction_start_date": string (ddmmyy) e.g. 180223,
         "transaction_end_date": string (ddmmyy),
 }
@@ -193,10 +207,16 @@ Transition small chat dialog to main AI chat page, which also **DELETES** the sm
 
 **`POST /api/gpt/small/transit`**
 
-**Sample Response**
+**Response**
 
 ```python
-"Sent to main AI chat"
+{"success": "Sent to main AI chat"}
+```
+
+or
+
+```python
+{"error": "Could not send to main AI chat"}
 ```
 
 ### Delete small conversation
@@ -205,8 +225,14 @@ Manually **delete** the small chat
 
 **`DELETE /api/gpt/small`**
 
-**Sample Response**
+**Response**
 
 ```python
-"Deleted small conversation successfully"
+{"success": "Deleted successfully"}
+```
+
+or
+
+```python
+{"error": "Delete failed"}
 ```

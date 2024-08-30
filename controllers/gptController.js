@@ -103,14 +103,14 @@ exports.deleteConversation = async (req, res) => {
       user: userId,
     });
     if (!conversation) {
-      return res.status(404).send('Conversation not found');
+      return res.status(404).json({ error: 'Conversation not found' });
     }
 
     await Conversation.deleteOne({ _id: conversationId });
-    res.status(200).send('Deleted successfully');
+    res.status(200).json({ success: 'Deleted successfully' });
   } catch (error) {
     console.error(error);
-    res.status(500).send('Unable to delete conversation');
+    res.status(500).json({ error: 'Unable to delete conversation' });
   }
 };
 
@@ -137,12 +137,80 @@ exports.getConversationMessages = async (req, res) => {
   }
 };
 
+exports.updateConversationSettings = async (req, res) => {
+  try {
+    const { conversationId } = req.params;
+    const { settings } = req.body;
+
+    // Validate settings
+    const validResponseLengths = ['short', 'medium', 'long'];
+    if (!validResponseLengths.includes(settings.response_length)) {
+      return res.status(400).json({ error: 'Invalid response length' });
+    }
+
+    if (
+      typeof settings.temperature !== 'number' ||
+      settings.temperature < 0 ||
+      settings.temperature > 1 ||
+      !/^-?\d+(\.\d{1})?$/.test(settings.temperature)
+    ) {
+      return res.status(400).json({
+        error:
+          'Invalid temperature. Only one decimal place is allowed and it must be between 0 and 1.',
+      });
+    }
+
+    const conversation = await Conversation.findByIdAndUpdate(
+      conversationId,
+      { settings },
+      { new: true }
+    ).exec();
+
+    if (!conversation) {
+      return res.status(404).json({ error: 'Conversation not found' });
+    }
+
+    res.json({
+      success: 'Settings updated successfully',
+    });
+  } catch (error) {
+    console.log(error);
+    res.status(500).json({ error: 'Could not update settings' });
+  }
+};
+
 exports.sendMainMessage = async (req, res) => {
   try {
     const userId = req.user._id;
-    if (!userId) return res.status(404).send('User not found');
-    if (!req.body.message) {
-      return res.status(400).send('User message not found');
+    if (!userId) return res.status(404).json({ error: 'User not found' });
+
+    let userMessage = req.body.messages;
+    // Check if received message is valid
+    const isValidMessage = (messages) => {
+      return (
+        Array.isArray(messages) &&
+        messages.every((item) => {
+          return (
+            typeof item === 'object' &&
+            (item.role === 'user' || item.role === 'assistant') &&
+            typeof item.content === 'string'
+          );
+        })
+      );
+    };
+    // console.log(userMessage);
+    if (!userMessage || !isValidMessage(userMessage)) {
+      return res.status(400).json({
+        error: 'Invalid message payload received.',
+      });
+    }
+
+    // Check if the last item in the array has a role of 'user'
+    let lastMessage = userMessage[userMessage.length - 1];
+    if (lastMessage.role !== 'user') {
+      return res.status(400).json({
+        error: "User's message not found",
+      });
     }
 
     let conversation;
@@ -151,7 +219,8 @@ exports.sendMainMessage = async (req, res) => {
         _id: req.body.conversation_id,
         user: userId,
       });
-      if (!conversation) return res.status(404).send('Conversation not found');
+      if (!conversation)
+        return res.status(404).json({ error: 'Conversation not found' });
     } else {
       // Create a new conversation if conversation_id is null or empty
       conversation = new Conversation({
@@ -165,8 +234,8 @@ exports.sendMainMessage = async (req, res) => {
         createdAt: new Date(),
       });
     }
-    // Append the new user message to the conversation
-    const newMessage = { role: 'user', content: req.body.message };
+    // Append the new user message to the conversation, which is the last element in the array
+    const newMessage = { role: 'user', content: userMessage[userMessage.length - 1].content};
     conversation.messages.push(newMessage);
 
     // Check if user requested a range of date
@@ -177,7 +246,6 @@ exports.sendMainMessage = async (req, res) => {
         if (!transactionStartDate || !/^\d{6}$/.test(transactionStartDate)) {
           throw new Error('Invalid transaction start date format');
         }
-        // startDate = parseDate(transactionStartDate);
         startDate = transactionStartDate;
       }
       if (req.body.transaction_end_date) {
@@ -195,11 +263,10 @@ exports.sendMainMessage = async (req, res) => {
     }
 
     // Temporary message to include user's transactions as CSV string, so that GPT can understand user's financial data
-
     let transactionData = {
       role: 'user',
       content:
-        'This is my transaction data in CSV format' +
+        'IGNORE PREVIOUS TRANSACTIONS. This is my UPDATED transaction data in CSV format' +
         (await getSortedTransactions(userId, startDate, endDate)),
     };
 
@@ -219,27 +286,21 @@ exports.sendMainMessage = async (req, res) => {
           'REMEMBER: DO NOT ANSWER IF IT IS NOT RELATED TO MONEY, FINANCE, INVESTMENT, BANKING, OR ANYTHING RELATED, questions that are considered follow up to the above are allowed',
       },
       messages: [
-        ...conversation.messages.slice(0, -1), // All elements except the last one
+        ...userMessage.slice(0, -1), // All elements except the last one
         transactionData, // The transaction data to inject
-        conversation.messages[conversation.messages.length - 1], // The last element
+        userMessage[userMessage.length - 1], // The last element
       ],
     };
     // Send POST request to external GPT service
     let response;
     try {
-      response = await axios.post(
-        'http://127.0.0.1:8000/api/generate',
-        payload
-      );
+      response = await axios.post('http://127.0.0.1:8000/api/generate', payload);
     } catch (error) {
-      // console.error('Error during axios request:', error);
-      return res.status(500).send(`Error from the GPT Service.`);
+      return res.status(500).json({ error: `Error from the GPT Service.` });
     }
-
-    let message = response.data.content;
+    let message = response.data.content;  
     const conversationTitle = message.title;
     conversation.title = conversationTitle;
-
     const assistantMessage = {
       role: message.role,
       content: message.content,
@@ -257,8 +318,8 @@ exports.sendMainMessage = async (req, res) => {
 
     res.status(200).send(serverResponse);
   } catch (error) {
-    console.error(error);
-    res.status(500).send('Server error');
+    console.error(error.message);
+    res.status(500).json({ error: 'Server error' });
   }
 };
 
@@ -294,7 +355,7 @@ async function getSuggestionPromptFromGPT(messages) {
       );
     } catch (error) {
       // console.error('Error during axios request:', error);
-      return res.status(500).send(`Error from the GPT Service.`);
+      return res.status(500).json({ error: `Error from the GPT Service.` });
     }
 
     let prompts;
@@ -318,8 +379,7 @@ async function getSuggestionPromptFromGPT(messages) {
   } catch (error) {
     console.error(error);
     return {
-      status: 'fail',
-      content:
+      error:
         'Internal Server Error, Unexpected array format, please try requesting again.',
     };
   }
@@ -329,16 +389,16 @@ exports.getSuggestionPrompt = async (req, res) => {
   try {
     const userId = req.user._id;
     // const user = await User.findById(req.params.userId);
-    if (!userId) return res.status(404).send('User not found');
+    if (!userId) return res.status(404).json({ error: 'User not found' });
 
     // Check for request body for type
     if (!req.body.type) {
-      return res.status(400).send('Prompt type is required');
+      return res.status(400).json({ error: 'Prompt type is required' });
     }
     if (
       !['general', 'budget', 'transactions', 'goals'].includes(req.body.type)
     ) {
-      return res.status(400).send('Invalid prompt type');
+      return res.status(400).json({ error: 'Invalid prompt type' });
     }
     let results;
     // If prompt type is general, check for req.body.conversation_id.
@@ -361,7 +421,7 @@ exports.getSuggestionPrompt = async (req, res) => {
           user: userId,
         });
         if (!conversation) {
-          return res.status(404).send('Conversation not found');
+          return res.status(404).json({ error: 'Conversation not found' });
         }
         results = await getSuggestionPromptFromGPT(conversation.messages);
       }
@@ -393,7 +453,7 @@ exports.getSuggestionPrompt = async (req, res) => {
               ],
             });
           default:
-            return res.status(400).send('Invalid prompt type');
+            return res.status(400).json({ error: 'Invalid prompt type' });
         }
       }
 
@@ -403,15 +463,15 @@ exports.getSuggestionPrompt = async (req, res) => {
 
     // Check if the results are successful
     if (results.status === 'fail') {
-      return res.status(500).send(results.content);
+      return res.status(500).json({ error: results.content });
     }
 
     // Return the prompts
     const prompts = results.content;
     if (!prompts || prompts.length === 0) {
-      return res
-        .status(500)
-        .send('Unable to generate prompts, please try  generating again.');
+      return res.status(500).json({
+        error: 'Unable to generate prompts, please try  generating again.',
+      });
     }
     serverResponse = {
       prompts: prompts,
@@ -419,7 +479,7 @@ exports.getSuggestionPrompt = async (req, res) => {
     res.status(200).send(serverResponse);
   } catch (error) {
     console.error(error);
-    res.status(500).send('Server error');
+    res.status(500).json({ error: 'Server error' });
   }
 };
 
@@ -428,7 +488,7 @@ exports.getSmallMessages = async (req, res) => {
   try {
     const userId = req.user._id;
     // const
-    if (!userId) return res.status(404).send('User not found');
+    if (!userId) return res.status(404).json({ error: 'User not found' });
 
     // Check if small conversation already exists
     let small_conversation;
@@ -449,18 +509,18 @@ exports.getSmallMessages = async (req, res) => {
     }
   } catch (error) {
     console.error(error);
-    res.status(500).send('Server error');
+    res.status(500).json({ error: 'Server error' });
   }
 };
 
 exports.sendSmallMessage = async (req, res) => {
   try {
     const userId = req.user._id;
-    if (!userId) return res.status(404).send('User not found');
+    if (!userId) return res.status(404).json({ error: 'User not found' });
 
     // Check for request body if it includes the prompt key.
     if (!req.body.prompt) {
-      return res.status(400).send('Prompt is required');
+      return res.status(400).json({ error: 'Prompt is required' });
     }
 
     // Check if small conversation already exists
@@ -504,7 +564,7 @@ exports.sendSmallMessage = async (req, res) => {
       );
     } catch (error) {
       // console.error('Error during axios request:', error);
-      return res.status(500).send(`Error from the GPT Service.`);
+      return res.status(500).json({ error: `Error from the GPT Service.` });
     }
 
     // Update the title
@@ -529,7 +589,7 @@ exports.sendSmallMessage = async (req, res) => {
     res.status(200).send(serverResponse);
   } catch (error) {
     console.error(error);
-    res.status(500).send('Server error');
+    res.status(500).json({ error: 'Server error' });
   }
 };
 
@@ -538,13 +598,15 @@ exports.transitSmallConversation = async (req, res) => {
     // Find the small conversation for the given user
     const userId = req.user._id;
     // const user = await User.findById(req.params.userId);
-    if (!userId) return res.status(404).send('User not found');
+    if (!userId) return res.status(404).json({ error: 'User not found' });
 
     const small_conversation = await SmallConversation.findOne({
       user: userId,
     });
     if (!small_conversation) {
-      return res.status(404).send('Small conversation not found for the user');
+      return res
+        .status(404)
+        .json({ error: 'Small conversation not found for the user' });
     }
 
     // Create a new conversation using the data from the small conversation
@@ -566,15 +628,15 @@ exports.transitSmallConversation = async (req, res) => {
     await SmallConversation.deleteOne({ _id: small_conversation._id });
 
     console.log('Transitioned to main AI chat successfully');
-    res.status(200).send('Sent to main AI chat');
+    res.status(200).json({ success: 'Sent to main AI chat' });
   } catch (error) {
     console.error(error);
     if (error.message === 'Small conversation not found for the user') {
-      return res
-        .status(404)
-        .send('Small conversation not found, could be already deleted?');
+      return res.status(404).json({
+        error: 'Small conversation not found, could be already deleted?',
+      });
     }
-    res.status(500).send('Could not send to main AI chat');
+    res.status(500).json({ error: 'Could not send to main AI chat' });
   }
 };
 
@@ -583,7 +645,7 @@ exports.deleteSmallConversation = async (req, res) => {
     // Find the small conversation for the given user
     const userId = req.user._id;
     // const user = await User.findById(req.params.userId);
-    if (!userId) return res.status(404).send('User not found');
+    if (!userId) return res.status(404).json({ error: 'User not found' });
 
     const small_conversation = await SmallConversation.findOne({
       user: userId,
@@ -596,14 +658,14 @@ exports.deleteSmallConversation = async (req, res) => {
     await SmallConversation.deleteOne({ _id: small_conversation._id });
 
     console.log('Deleted small conversation successfully');
-    res.status(200).send('Deleted successfully');
+    res.status(200).json({ success: 'Deleted successfully' });
   } catch (error) {
     console.error(error);
     if (error.message === 'Small conversation not found for the user') {
-      return res
-        .status(404)
-        .send('Small conversation not found, could be already deleted?');
+      return res.status(404).json({
+        error: 'Small conversation not found, could be already deleted?',
+      });
     }
-    res.status(500).send('Could not delete');
+    res.status(500).json({ error: 'Delete failed' });
   }
 };
