@@ -294,7 +294,7 @@ exports.sendMainMessage = async (req, res) => {
     // Send POST request to external GPT service
     let response;
     try {
-      response = await axios.post('http://127.0.0.1:8000/api/test', payload);
+      response = await axios.post('http://127.0.0.1:8000/api/generate', payload);
     } catch (error) {
       return res.status(500).json({ error: `Error from the GPT Service.` });
     }
