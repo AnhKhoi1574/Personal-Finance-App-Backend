@@ -1,6 +1,7 @@
 const {Budget} = require('../models/budgetModel');
 const { User } = require('../models/userModel');
 
+//Create budget 
 exports.createBudget = async (req, res) => {
   try {
     const userId = req.user._id;
