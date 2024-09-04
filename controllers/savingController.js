@@ -162,16 +162,22 @@ exports.deleteSaving = async (req, res) => {
       });
     }
 
+    // Transfer the saving amount back to the current balance
+    user.currentBalance += user.saving.currentAmount;
+
     // Delete the saving goal
     user.saving = undefined;
 
     // Save the updated user document
     await user.save();
 
-    // Send a success response with a message
+    // Send a success response with the updated balance
     res.status(200).json({
       status: 'success',
-      message: 'Saving goal deleted successfully',
+      message: 'Saving goal deleted successfully, and funds transferred to current balance',
+      data: {
+        currentBalance: user.currentBalance,
+      },
     });
   } catch (err) {
     // Handle any errors during the process
@@ -182,6 +188,7 @@ exports.deleteSaving = async (req, res) => {
     console.error(err);
   }
 };
+
 
 // Add money to saving
 exports.addMoneyToSaving = async (req, res) => {
