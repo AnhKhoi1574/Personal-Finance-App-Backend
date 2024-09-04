@@ -65,12 +65,12 @@ exports.createTransaction = async (req, res) => {
       }
     }
 
-    // Create the transaction
+    // Create the main transaction
     const newTransaction = new Transaction({
       date,
       type,
       category,
-      transactionAmount,
+      transactionAmount: actualTransactionAmount, // Save the actual amount after savings cut-off
       title,
       isSavingsTransfer: false,
     });
@@ -79,21 +79,23 @@ exports.createTransaction = async (req, res) => {
     user.transactions.push(newTransaction);
 
     // Update the user's current balance
-    user.currentBalance += type === 'income' ? actualTransactionAmount : -transactionAmount;
+    user.currentBalance += actualTransactionAmount;
 
     // Adjust the budget if it's an expense transaction
     if (type === 'expense' && user.budget && user.budget.categories[category]) {
-      user.budget.categories[category].spent += transactionAmount;
+      user.budget.categories[category].spent += actualTransactionAmount;
     }
 
     // Save the updated user document
     await user.save();
 
-    // Respond with the newly created transaction
+    // Respond with the newly created transaction, showing the actual transaction amount
     res.status(201).json({
       status: 'success',
       message: 'Transaction created successfully',
-      data: newTransaction,
+      data: {
+        transaction: newTransaction,
+      },
     });
   } catch (error) {
     res.status(500).json({
