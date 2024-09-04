@@ -249,20 +249,22 @@ exports.updateTransaction = async (req, res) => {
       });
     }
 
-    // Reverse the effects of the existing transaction on the budget and saving
+    // Prevent updating saving transactions
     if (transaction.isSavingsTransfer) {
-      if (transaction.type === 'income') {
-        user.currentBalance -= transaction.transactionAmount;
-        user.saving.currentAmount -= transaction.transactionAmount;
-      } else {
-        user.currentBalance += transaction.transactionAmount;
-        user.saving.currentAmount -= transaction.transactionAmount;
+      return res.status(403).json({
+        status: 'fail',
+        message: 'Saving transactions cannot be updated',
+      });
+    }
+
+    // Reverse the effects of the existing transaction on balance and saving amount
+    if (transaction.type === 'income') {
+      user.currentBalance -= transaction.transactionAmount;
+    } else if (transaction.type === 'expense') {
+      user.currentBalance += transaction.transactionAmount;
+      if (user.budget && user.budget.categories[transaction.category]) {
+        user.budget.categories[transaction.category].spent -= transaction.transactionAmount;
       }
-      if (user.budget && user.budget.categories.saving) {
-        user.budget.categories.saving.spent -= transaction.transactionAmount;
-      }
-    } else if (transaction.type === 'expense' && user.budget && user.budget.categories[transaction.category]) {
-      user.budget.categories[transaction.category].spent -= transaction.transactionAmount;
     }
 
     // Update the transaction fields
@@ -273,19 +275,13 @@ exports.updateTransaction = async (req, res) => {
     if (title) transaction.title = title;
 
     // Apply the new transaction effects to balance and budget
-    if (transaction.isSavingsTransfer) {
-      if (transaction.type === 'income') {
-        user.currentBalance += transaction.transactionAmount;
-        user.saving.currentAmount += transaction.transactionAmount;
-      } else {
-        user.currentBalance -= transaction.transactionAmount;
-        user.saving.currentAmount += transaction.transactionAmount;
+    if (type === 'income') {
+      user.currentBalance += transactionAmount;
+    } else if (type === 'expense') {
+      user.currentBalance -= transactionAmount;
+      if (user.budget && user.budget.categories[category]) {
+        user.budget.categories[category].spent += transactionAmount;
       }
-      if (user.budget && user.budget.categories.saving) {
-        user.budget.categories.saving.spent += transaction.transactionAmount;
-      }
-    } else if (transaction.type === 'expense' && user.budget && user.budget.categories[transaction.category]) {
-      user.budget.categories[transaction.category].spent += transaction.transactionAmount;
     }
 
     // Save the updated user document
@@ -315,52 +311,41 @@ exports.deleteTransaction = async (req, res) => {
     // Find the user by ID
     const user = await User.findById(req.user._id);
     if (!user) {
-      return res.status(404).json({ status: 'fail', message: 'User not found' });
+      return res.status(404).json({
+        status: 'fail',
+        message: 'User not found',
+      });
     }
 
     // Find the transaction in the user's transactions array
-    const transactionIndex = user.transactions.findIndex(
-      (transaction) => transaction._id.toString() === transactionId
-    );
-
-    if (transactionIndex === -1) {
-      return res.status(404).json({ status: 'fail', message: 'Transaction not found' });
+    const transaction = user.transactions.id(transactionId);
+    if (!transaction) {
+      return res.status(404).json({
+        status: 'fail',
+        message: 'Transaction not found',
+      });
     }
 
-    // Get the transaction to be deleted
-    const transactionToDelete = user.transactions[transactionIndex];
+    // Prevent deletion of saving transactions
+    if (transaction.isSavingsTransfer) {
+      return res.status(403).json({
+        status: 'fail',
+        message: 'Saving transactions cannot be deleted',
+      });
+    }
 
     // Adjust the current balance and saving amount based on the transaction type and whether it's a savings transfer
-    if (transactionToDelete.isSavingsTransfer) {
-      if (transactionToDelete.type === 'income') {
-        // Undo an income transfer from savings to current balance
-        user.currentBalance -= transactionToDelete.transactionAmount;
-        user.saving.currentAmount += transactionToDelete.transactionAmount;
-      } else if (transactionToDelete.type === 'expense') {
-        // Undo an expense transfer from current balance to savings
-        user.currentBalance += transactionToDelete.transactionAmount;
-        user.saving.currentAmount -= transactionToDelete.transactionAmount;
-      }
-      if (user.budget && user.budget.categories.saving) {
-        user.budget.categories.saving.spent -= transactionToDelete.transactionAmount;
-      }
-    } else {
-      if (transactionToDelete.type === 'income') {
-        // Undo an income transaction (add back the amount to current balance)
-        user.currentBalance -= transactionToDelete.transactionAmount;
-      } else if (transactionToDelete.type === 'expense') {
-        // Undo an expense transaction (subtract the amount from current balance)
-        user.currentBalance += transactionToDelete.transactionAmount;
-
-        // Adjust the budget if it's an expense transaction
-        if (user.budget && user.budget.categories[transactionToDelete.category]) {
-          user.budget.categories[transactionToDelete.category].spent -= transactionToDelete.transactionAmount;
-        }
+    if (transaction.type === 'income') {
+      user.currentBalance -= transaction.transactionAmount;
+    } else if (transaction.type === 'expense') {
+      user.currentBalance += transaction.transactionAmount;
+      if (user.budget && user.budget.categories[transaction.category]) {
+        user.budget.categories[transaction.category].spent -= transaction.transactionAmount;
       }
     }
 
     // Remove the transaction from the user's transactions array
-    user.transactions.splice(transactionIndex, 1);
+    transaction.remove();
 
     // Save the updated user document
     await user.save();
@@ -374,6 +359,7 @@ exports.deleteTransaction = async (req, res) => {
     res.status(500).json({
       status: 'error',
       message: 'An error occurred while deleting the transaction',
-    });    
+    });
   }
 };
+
