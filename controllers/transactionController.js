@@ -81,8 +81,14 @@ exports.createTransaction = async (req, res) => {
     // Update the user's current balance
     user.currentBalance += type === 'income' ? actualTransactionAmount : -transactionAmount;
 
-    // Adjust the budget if it's an expense transaction
-    if (type === 'expense' && user.budget && user.budget.categories[category]) {
+    // Adjust the budget if it's an expense transaction and falls within the current budget period
+    if (
+      type === 'expense' && 
+      user.budget &&
+      new Date(date) >= new Date(user.budget.startDate) && 
+      new Date(date) <= new Date(user.budget.deadline) &&
+      user.budget.categories[category]
+    ) {
       user.budget.categories[category].spent += actualTransactionAmount;
     }
 

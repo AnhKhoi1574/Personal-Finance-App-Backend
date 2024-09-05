@@ -1,7 +1,7 @@
 const {Budget} = require('../models/budgetModel');
 const { User } = require('../models/userModel');
 
-//Create budget 
+// Create budget
 exports.createBudget = async (req, res) => {
   try {
     const userId = req.user._id;
@@ -24,12 +24,12 @@ exports.createBudget = async (req, res) => {
     // Calculate the total limit amount
     const limitAmount = Object.values(categories).reduce((total, category) => total + category.limit, 0);
 
-    // Calculate the spent amount for each category based on existing transactions
+    // Calculate the spent amount for each category based on ALL transactions between the startDate and deadline
     user.transactions.forEach((transaction) => {
       if (
         transaction.type === 'expense' &&
-        transaction.date >= new Date(startDate) &&
-        transaction.date <= new Date(deadline) &&
+        new Date(transaction.date) >= new Date(startDate) &&
+        new Date(transaction.date) <= new Date(deadline) &&
         categories[transaction.category]
       ) {
         categories[transaction.category].spent += transaction.transactionAmount;
@@ -94,7 +94,7 @@ exports.getBudget = async (req, res) => {
 exports.updateBudget = async (req, res) => {
   try {
     const userId = req.user._id;
-    const { title, deadline, categories } = req.body;
+    const { title, startDate, deadline, categories } = req.body;
 
     // Find the user's budget
     const user = await User.findById(userId);
@@ -105,9 +105,8 @@ exports.updateBudget = async (req, res) => {
       });
     }
 
-    // Update the title and deadline if provided
+    // Update the title if provided
     if (title) user.budget.title = title;
-    if (deadline) user.budget.deadline = deadline;
 
     // Update the categories and recalculate the limitAmount if categories are provided
     if (categories) {
@@ -119,6 +118,29 @@ exports.updateBudget = async (req, res) => {
 
       // Recalculate the total limitAmount
       user.budget.limitAmount = Object.values(user.budget.categories).reduce((total, category) => total + category.limit, 0);
+    }
+
+    // If startDate or deadline is provided, update and recalculate spent amounts
+    if (startDate || deadline) {
+      if (startDate) user.budget.startDate = startDate;
+      if (deadline) user.budget.deadline = deadline;
+
+      // Reset spent amounts for each category
+      Object.keys(user.budget.categories).forEach((category) => {
+        user.budget.categories[category].spent = 0;
+      });
+
+      // Recalculate the spent amount for each category based on transactions within the new date range
+      user.transactions.forEach((transaction) => {
+        if (
+          transaction.type === 'expense' &&
+          new Date(transaction.date) >= new Date(user.budget.startDate) &&
+          new Date(transaction.date) <= new Date(user.budget.deadline) &&
+          user.budget.categories[transaction.category]
+        ) {
+          user.budget.categories[transaction.category].spent += transaction.transactionAmount;
+        }
+      });
     }
 
     // Save the updated budget
