@@ -32,6 +32,7 @@ exports.createTransaction = async (req, res) => {
     }
 
     let actualTransactionAmount = transactionAmount;
+    let savingAmount = 0;
 
     // Handle automatic savings if the transaction is of type 'income'
     if (
@@ -40,18 +41,28 @@ exports.createTransaction = async (req, res) => {
       user.saving.isAutoSavingEnabled &&
       user.saving.autoSavingPercentage > 0
     ) {
-      const savingAmount =
-        (transactionAmount * user.saving.autoSavingPercentage) / 100;
+      savingAmount = (transactionAmount * user.saving.autoSavingPercentage) / 100;
 
-      user.saving.currentAmount += savingAmount;
-      actualTransactionAmount -= savingAmount;
+      // Calculate potential new saving amount
+      const potentialNewSavingAmount = user.saving.currentAmount + savingAmount;
+
+      // If the potential new saving amount exceeds the target amount, adjust the saving amount
+      if (potentialNewSavingAmount > user.saving.targetAmount) {
+        const allowableSavingAmount = user.saving.targetAmount - user.saving.currentAmount;
+        user.saving.currentAmount += allowableSavingAmount;
+        actualTransactionAmount -= allowableSavingAmount;
+        savingAmount = allowableSavingAmount; // Update savingAmount to reflect the actual amount added
+      } else {
+        user.saving.currentAmount += savingAmount;
+        actualTransactionAmount -= savingAmount;
+      }
 
       // Create a corresponding savings transaction with the same date as the income transaction
       const savingTransaction = new Transaction({
         date, // Set the same date as the user-entered income transaction
         type: 'expense',
         category: 'saving',
-        transactionAmount: savingAmount,
+        transactionAmount: savingAmount, // Use the adjusted savingAmount
         title: 'Saving from income',
         isSavingsTransfer: true,
       });
@@ -111,6 +122,7 @@ exports.createTransaction = async (req, res) => {
     });
   }
 };
+
 
 // Get all transactions
 exports.getAllTransactions = async (req, res) => {
