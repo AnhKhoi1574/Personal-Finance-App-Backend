@@ -46,7 +46,7 @@ exports.updateUserProfile = async (req, res) => {
     }
 
     // Update the user fields only if they are provided
-    const { name, email, password, birthday, currentBalance } = req.body;
+    const { name, email, password, birthday } = req.body;
     if (name) user.name = name;
     if (email) user.email = email;
     if (password) {
@@ -54,7 +54,6 @@ exports.updateUserProfile = async (req, res) => {
       user.password = await bcrypt.hash(password, salt);
     }
     if (birthday) user.birthday = birthday;
-    if (currentBalance !== undefined) user.currentBalance = currentBalance;
 
     // Save the updated user document
     await user.save();
