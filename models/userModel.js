@@ -37,6 +37,7 @@ const userSchema = new mongoose.Schema(
       type: Number,
       min: 0,
       default: 0,
+      require: true,
     },
     transactions: [transactionSchema],
     saving: savingSchema,
