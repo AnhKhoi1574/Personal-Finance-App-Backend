@@ -264,6 +264,11 @@ exports.addMoneyToSaving = async (req, res) => {
     };
     user.transactions.push(addMoneyTransaction);
 
+    // Update the budget for the "saving" category
+    if (user.budget && user.budget.categories.saving) {
+      user.budget.categories.saving.spent += amount;
+    }
+
     // Save the updated user document
     await user.save();
 
