@@ -328,26 +328,40 @@ exports.deleteTransaction = async (req, res) => {
       });
     }
 
-    // Prevent deletion of saving transactions
+    // Prevent direct deletion of saving transactions
     if (transaction.isSavingsTransfer) {
       return res.status(403).json({
         status: 'fail',
-        message: 'Saving transactions cannot be deleted',
+        message: 'Saving transactions cannot be deleted directly',
       });
     }
 
-    // Adjust the current balance and saving amount based on the transaction type and whether it's a savings transfer
+    // If this is an income transaction, check if there is a corresponding saving transaction
     if (transaction.type === 'income') {
+      // Find the index of the associated saving transaction
+      const savingTransactionIndex = user.transactions.findIndex(
+        (t) => t.isSavingsTransfer && t.date.getTime() === transaction.date.getTime()
+      );
+
+      if (savingTransactionIndex !== -1) {
+        // Remove the corresponding saving transaction using splice
+        user.transactions.splice(savingTransactionIndex, 1);
+      }
+
+      // Adjust the current balance (subtract income)
       user.currentBalance -= transaction.transactionAmount;
     } else if (transaction.type === 'expense') {
+      // Adjust the current balance (add back expense)
       user.currentBalance += transaction.transactionAmount;
+
+      // Adjust the budget if necessary
       if (user.budget && user.budget.categories[transaction.category]) {
         user.budget.categories[transaction.category].spent -= transaction.transactionAmount;
       }
     }
 
-    // Remove the transaction from the user's transactions array
-    transaction.remove();
+    // Remove the main transaction from the user's transactions array using splice
+    user.transactions.pull({ _id: transactionId });
 
     // Save the updated user document
     await user.save();
@@ -361,7 +375,11 @@ exports.deleteTransaction = async (req, res) => {
     res.status(500).json({
       status: 'error',
       message: 'An error occurred while deleting the transaction',
+      error: err.message,
     });
   }
 };
+
+
+
 
