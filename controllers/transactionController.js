@@ -46,9 +46,9 @@ exports.createTransaction = async (req, res) => {
       user.saving.currentAmount += savingAmount;
       actualTransactionAmount -= savingAmount;
 
-      // Create a corresponding savings transaction
+      // Create a corresponding savings transaction with the same date as the income transaction
       const savingTransaction = new Transaction({
-        date: new Date(),
+        date, // Set the same date as the user-entered income transaction
         type: 'expense',
         category: 'saving',
         transactionAmount: savingAmount,
@@ -67,7 +67,7 @@ exports.createTransaction = async (req, res) => {
 
     // Create the main transaction
     const newTransaction = new Transaction({
-      date,
+      date, // Use the user-provided date for the income transaction
       type,
       category,
       transactionAmount: actualTransactionAmount, // Save the actual amount after savings cut-off
@@ -79,7 +79,7 @@ exports.createTransaction = async (req, res) => {
     user.transactions.push(newTransaction);
 
     // Update the user's current balance
-    user.currentBalance += actualTransactionAmount;
+    user.currentBalance += type === 'income' ? actualTransactionAmount : -transactionAmount;
 
     // Adjust the budget if it's an expense transaction
     if (type === 'expense' && user.budget && user.budget.categories[category]) {
