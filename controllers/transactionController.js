@@ -398,10 +398,27 @@ exports.deleteTransaction = async (req, res) => {
   }
 };
 
-// Get chart data for all transactions
+// Get chart data for all transactions of a specific year
 exports.getChartData = async (req, res) => {
   try {
     const userId = req.user._id;
+    const { year } = req.query; // Get the year from the request query
+
+    if (!year) {
+      return res.status(400).json({
+        status: 'fail',
+        message: 'Please provide a year in the request query',
+      });
+    }
+
+    // Convert the year to a number to ensure it's valid
+    const targetYear = parseInt(year);
+    if (isNaN(targetYear)) {
+      return res.status(400).json({
+        status: 'fail',
+        message: 'Invalid year format',
+      });
+    }
 
     // Find the user and get their transactions
     const user = await User.findById(userId).select('transactions');
@@ -414,57 +431,51 @@ exports.getChartData = async (req, res) => {
     // Sort transactions by date
     transactions.sort((a, b) => new Date(a.date) - new Date(b.date));
 
-    // Initialize a map to store data by year and month
+    // Initialize a map to store data by month
     const dataMap = new Map();
     const monthNames = [
       'January', 'February', 'March', 'April', 'May', 'June',
       'July', 'August', 'September', 'October', 'November', 'December'
     ];
 
-    // Loop through each transaction
+    // Loop through each transaction, filtering by the target year
     transactions.forEach(transaction => {
       const date = new Date(transaction.date);
-      const year = date.getFullYear();
+      const transactionYear = date.getFullYear();
       const month = date.getMonth(); // 0-11 for months in JavaScript
 
-      const key = `${year}-${month}`;
-      
-      if (!dataMap.has(key)) {
-        dataMap.set(key, { year, month: monthNames[month], income: 0, expense: 0 });
-      }
+      if (transactionYear === targetYear) {
+        const key = `${month}`;
 
-      const dataEntry = dataMap.get(key);
+        if (!dataMap.has(key)) {
+          dataMap.set(key, { month: monthNames[month], income: 0, expense: 0 });
+        }
 
-      if (transaction.type === 'income') {
-        dataEntry.income += transaction.transactionAmount;
-      } else if (transaction.type === 'expense') {
-        dataEntry.expense += transaction.transactionAmount;
+        const dataEntry = dataMap.get(key);
+
+        if (transaction.type === 'income') {
+          dataEntry.income += transaction.transactionAmount;
+        } else if (transaction.type === 'expense') {
+          dataEntry.expense += transaction.transactionAmount;
+        }
       }
     });
 
-    // Get the earliest and latest transactions' dates
-    const earliestDate = transactions[0] ? new Date(transactions[0].date) : new Date();
-    const latestDate = transactions[transactions.length - 1] ? new Date(transactions[transactions.length - 1].date) : new Date();
-
-    // Fill in all months for each year that has transactions
+    // Initialize an array to hold the final data for all months
     const filledData = [];
-    const startYear = earliestDate.getFullYear();
-    const endYear = latestDate.getFullYear();
 
-    // Loop through each year and month to ensure all months are included
-    for (let year = startYear; year <= endYear; year++) {
-      for (let month = 0; month < 12; month++) {
-        const key = `${year}-${month}`;
+    // Ensure that all 12 months are included, even if there are no transactions
+    for (let month = 0; month < 12; month++) {
+      const key = `${month}`;
 
-        if (dataMap.has(key)) {
-          filledData.push(dataMap.get(key));
-        } else {
-          filledData.push({ year, month: monthNames[month], income: 0, expense: 0 });
-        }
+      if (dataMap.has(key)) {
+        filledData.push(dataMap.get(key));
+      } else {
+        filledData.push({ month: monthNames[month], income: 0, expense: 0 });
       }
     }
 
-    // Respond with the filled data
+    // Respond with the data for the requested year
     res.status(200).json({
       status: 'success',
       data: filledData,
@@ -477,6 +488,7 @@ exports.getChartData = async (req, res) => {
     });
   }
 };
+
 
 
 
