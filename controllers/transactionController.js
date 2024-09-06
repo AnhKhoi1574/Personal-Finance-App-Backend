@@ -398,6 +398,86 @@ exports.deleteTransaction = async (req, res) => {
   }
 };
 
+// Get chart data for all transactions
+exports.getChartData = async (req, res) => {
+  try {
+    const userId = req.user._id;
+
+    // Find the user and get their transactions
+    const user = await User.findById(userId).select('transactions');
+    if (!user) {
+      return res.status(404).json({ status: 'fail', message: 'User not found' });
+    }
+
+    const transactions = user.transactions;
+
+    // Sort transactions by date
+    transactions.sort((a, b) => new Date(a.date) - new Date(b.date));
+
+    // Initialize a map to store data by year and month
+    const dataMap = new Map();
+    const monthNames = [
+      'January', 'February', 'March', 'April', 'May', 'June',
+      'July', 'August', 'September', 'October', 'November', 'December'
+    ];
+
+    // Loop through each transaction
+    transactions.forEach(transaction => {
+      const date = new Date(transaction.date);
+      const year = date.getFullYear();
+      const month = date.getMonth(); // 0-11 for months in JavaScript
+
+      const key = `${year}-${month}`;
+      
+      if (!dataMap.has(key)) {
+        dataMap.set(key, { year, month: monthNames[month], income: 0, expense: 0 });
+      }
+
+      const dataEntry = dataMap.get(key);
+
+      if (transaction.type === 'income') {
+        dataEntry.income += transaction.transactionAmount;
+      } else if (transaction.type === 'expense') {
+        dataEntry.expense += transaction.transactionAmount;
+      }
+    });
+
+    // Get the earliest and latest transactions' dates
+    const earliestDate = transactions[0] ? new Date(transactions[0].date) : new Date();
+    const latestDate = transactions[transactions.length - 1] ? new Date(transactions[transactions.length - 1].date) : new Date();
+
+    // Fill in all months for each year that has transactions
+    const filledData = [];
+    const startYear = earliestDate.getFullYear();
+    const endYear = latestDate.getFullYear();
+
+    // Loop through each year and month to ensure all months are included
+    for (let year = startYear; year <= endYear; year++) {
+      for (let month = 0; month < 12; month++) {
+        const key = `${year}-${month}`;
+
+        if (dataMap.has(key)) {
+          filledData.push(dataMap.get(key));
+        } else {
+          filledData.push({ year, month: monthNames[month], income: 0, expense: 0 });
+        }
+      }
+    }
+
+    // Respond with the filled data
+    res.status(200).json({
+      status: 'success',
+      data: filledData,
+    });
+  } catch (err) {
+    res.status(500).json({
+      status: 'error',
+      message: 'An error occurred while fetching chart data',
+      error: err.message,
+    });
+  }
+};
+
 
 
 
