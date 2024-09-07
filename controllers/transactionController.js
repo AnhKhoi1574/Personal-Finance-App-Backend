@@ -28,7 +28,9 @@ exports.createTransaction = async (req, res) => {
     // Find the user by ID and populate saving and budget data
     const user = await User.findById(userId).populate('saving');
     if (!user) {
-      return res.status(404).json({ status: 'error', message: 'User not found' });
+      return res
+        .status(404)
+        .json({ status: 'error', message: 'User not found' });
     }
 
     let actualTransactionAmount = transactionAmount;
@@ -41,14 +43,16 @@ exports.createTransaction = async (req, res) => {
       user.saving.isAutoSavingEnabled &&
       user.saving.autoSavingPercentage > 0
     ) {
-      savingAmount = (transactionAmount * user.saving.autoSavingPercentage) / 100;
+      savingAmount =
+        (transactionAmount * user.saving.autoSavingPercentage) / 100;
 
       // Calculate potential new saving amount
       const potentialNewSavingAmount = user.saving.currentAmount + savingAmount;
 
       // If the potential new saving amount exceeds the target amount, adjust the saving amount
       if (potentialNewSavingAmount > user.saving.targetAmount) {
-        const allowableSavingAmount = user.saving.targetAmount - user.saving.currentAmount;
+        const allowableSavingAmount =
+          user.saving.targetAmount - user.saving.currentAmount;
         user.saving.currentAmount += allowableSavingAmount;
         actualTransactionAmount -= allowableSavingAmount;
         savingAmount = allowableSavingAmount; // Update savingAmount to reflect the actual amount added
@@ -90,13 +94,14 @@ exports.createTransaction = async (req, res) => {
     user.transactions.push(newTransaction);
 
     // Update the user's current balance
-    user.currentBalance += type === 'income' ? actualTransactionAmount : -transactionAmount;
+    user.currentBalance +=
+      type === 'income' ? actualTransactionAmount : -transactionAmount;
 
     // Adjust the budget if it's an expense transaction and falls within the current budget period
     if (
-      type === 'expense' && 
+      type === 'expense' &&
       user.budget &&
-      new Date(date) >= new Date(user.budget.startDate) && 
+      new Date(date) >= new Date(user.budget.startDate) &&
       new Date(date) <= new Date(user.budget.deadline) &&
       user.budget.categories[category]
     ) {
@@ -122,7 +127,6 @@ exports.createTransaction = async (req, res) => {
     });
   }
 };
-
 
 // Get all transactions
 exports.getAllTransactions = async (req, res) => {
@@ -283,7 +287,8 @@ exports.updateTransaction = async (req, res) => {
     } else if (transaction.type === 'expense') {
       user.currentBalance += transaction.transactionAmount;
       if (user.budget && user.budget.categories[transaction.category]) {
-        user.budget.categories[transaction.category].spent -= transaction.transactionAmount;
+        user.budget.categories[transaction.category].spent -=
+          transaction.transactionAmount;
       }
     }
 
@@ -358,7 +363,8 @@ exports.deleteTransaction = async (req, res) => {
     if (transaction.type === 'income') {
       // Find the index of the associated saving transaction
       const savingTransactionIndex = user.transactions.findIndex(
-        (t) => t.isSavingsTransfer && t.date.getTime() === transaction.date.getTime()
+        (t) =>
+          t.isSavingsTransfer && t.date.getTime() === transaction.date.getTime()
       );
 
       if (savingTransactionIndex !== -1) {
@@ -374,7 +380,8 @@ exports.deleteTransaction = async (req, res) => {
 
       // Adjust the budget if necessary
       if (user.budget && user.budget.categories[transaction.category]) {
-        user.budget.categories[transaction.category].spent -= transaction.transactionAmount;
+        user.budget.categories[transaction.category].spent -=
+          transaction.transactionAmount;
       }
     }
 
@@ -423,7 +430,9 @@ exports.getChartData = async (req, res) => {
     // Find the user and get their transactions
     const user = await User.findById(userId).select('transactions');
     if (!user) {
-      return res.status(404).json({ status: 'fail', message: 'User not found' });
+      return res
+        .status(404)
+        .json({ status: 'fail', message: 'User not found' });
     }
 
     const transactions = user.transactions;
@@ -434,12 +443,22 @@ exports.getChartData = async (req, res) => {
     // Initialize a map to store data by month
     const dataMap = new Map();
     const monthNames = [
-      'January', 'February', 'March', 'April', 'May', 'June',
-      'July', 'August', 'September', 'October', 'November', 'December'
+      'January',
+      'February',
+      'March',
+      'April',
+      'May',
+      'June',
+      'July',
+      'August',
+      'September',
+      'October',
+      'November',
+      'December',
     ];
 
     // Loop through each transaction, filtering by the target year
-    transactions.forEach(transaction => {
+    transactions.forEach((transaction) => {
       const date = new Date(transaction.date);
       const transactionYear = date.getFullYear();
       const month = date.getMonth(); // 0-11 for months in JavaScript
@@ -489,7 +508,43 @@ exports.getChartData = async (req, res) => {
   }
 };
 
+// Get all years that have transactions (income or expense) for the user
+exports.getTransactionYear = async (req, res) => {
+  try {
+    const userId = req.user._id;
 
+    // Find the user and get their transactions
+    const user = await User.findById(userId).select('transactions');
+    if (!user) {
+      return res
+        .status(404)
+        .json({ status: 'fail', message: 'User not found' });
+    }
 
+    const transactions = user.transactions;
 
+    // Initialize a set to store unique years
+    const yearsSet = new Set();
 
+    // Loop through each transaction and extract the year
+    transactions.forEach((transaction) => {
+      const transactionYear = new Date(transaction.date).getFullYear();
+      yearsSet.add(transactionYear);
+    });
+
+    // Convert the set to an array and sort the years in ascending order
+    const yearsArray = Array.from(yearsSet).sort((a, b) => a - b);
+
+    // Respond with the years array
+    res.status(200).json({
+      status: 'success',
+      data: yearsArray,
+    });
+  } catch (err) {
+    res.status(500).json({
+      status: 'error',
+      message: 'An error occurred while fetching transaction years',
+      error: err.message,
+    });
+  }
+};

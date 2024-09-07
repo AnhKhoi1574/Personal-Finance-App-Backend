@@ -9,11 +9,15 @@ router
   .route('/')
   .post(authController.protect, transactionController.createTransaction)
   .get(authController.protect, transactionController.getAllTransactions);
-  
-router 
+
+router
   .route('/getChartData')
   .get(authController.protect, transactionController.getChartData);
-  
+
+router
+  .route('/getTransactionYear')
+  .get(authController.protect, transactionController.getTransactionYear);
+
 // Route for getting, updating and deleting a specific transaction by ID
 router
   .route('/:transactionId')
