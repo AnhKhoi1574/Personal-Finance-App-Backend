@@ -18,9 +18,10 @@ npx nodemon server.js
 
 ### Load conversation history
 
+Support Pagination
+
 **`GET /api/gpt/conversations`**
 
-Support Pagination
 
 **Sample Response**
 
@@ -67,27 +68,35 @@ Support Pagination
 
 ### Get Suggestion Prompts
 
+Generate an array of 4 prompts
+
 **`POST /api/gpt/getPrompts`**
 
 **Header Payload**
 
 ```javascript
 {
-        // type "general" is for main chat,
-        // type "budget", "goals", "transactions" are for small conversations.
-        "type": string,
-
-        // conversation_id is REQUIRED for "general" type if you want the prompts to be relevant to previous messages.
-        "conversation_id": "66cdabbe38a3dba6310f5dcb",
+    "messages": [
+        {
+            "role": "user",
+            "content": "Analyze my July Spendings"
+        },
+        {
+            "role": "assistant",
+            "content": "Sure, let's break down your July spendings...",
+        },
+        ...
+    ],
 }
 ```
+
+**Note**: messages are optional, if none is supplied, default prompts will be returned instead.
 
 **Sample Response**
 
 ```python
 {
-    "title": "Monthly Spending Analysis",
-    "messages": "Your July spending...",
+    "prompts": ["...", "...", "...", "..."]
 }
 ```
 
@@ -149,90 +158,7 @@ Manually **delete** the conversation
 **Sample Response**
 
 ```python
-"Deleted successfully"
-```
-
-### Load all messages in the small conversation
-
-Small chat dialog
-
-**`GET /api/gpt/small`**
-
-**Sample Response:** User never interacted with the small chat dialog, or is **deleted**.
-
-```python
-[] <- Empty array
-```
-
-**Sample Response:** User has past interactions with the small chat dialog
-
-```python
-[
-    {
-        "role": "user",
-        "content": "How do I..."},
-    {
-        "role": "assistant",
-        "content": "I am happy to help! To...",
-    },
-    ...
-]
-```
-
-### Get GPT's response (for small conversation)
-
-Small chat dialog only
-
-**`POST /api/gpt/small/generate`**
-
-**Header Payload**
-
-```python
 {
-    "message": "Analyze my last week spendings"
+    "success: "Deleted successfully"
 }
-```
-
-**Sample Response**
-
-```python
-{
-    "content": "Your last week spendings..."
-}
-```
-
-### Transit small conversation to main conversation
-
-Transition small chat dialog to main AI chat page, which also **DELETES** the small chat
-
-**`POST /api/gpt/small/transit`**
-
-**Response**
-
-```python
-{"success": "Sent to main AI chat"}
-```
-
-or
-
-```python
-{"error": "Could not send to main AI chat"}
-```
-
-### Delete small conversation
-
-Manually **delete** the small chat
-
-**`DELETE /api/gpt/small`**
-
-**Response**
-
-```python
-{"success": "Deleted successfully"}
-```
-
-or
-
-```python
-{"error": "Delete failed"}
 ```
