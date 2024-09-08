@@ -67,31 +67,5 @@ const conversationSchema = new mongoose.Schema({
   },
 });
 
-const smallConversationSchema = new mongoose.Schema({
-  user: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'User',
-    required: true,
-    unique: true, // One user can only have one small conversation
-  },
-  title: {
-    type: String,
-    required: false,
-    default: 'Small chat dialog',
-  },
-  createdAt: {
-    type: Date,
-    default: Date.now,
-  },
-  messages: {
-    type: [messageSchema],
-    default: [],
-  },
-});
-
 // Export the conversation schema
-const Conversation = mongoose.model('Conversation', conversationSchema);
-
-// Small Conversation is the small dialog on each page
-const SmallConversation = mongoose.model('SmallConversation', smallConversationSchema);
-module.exports = { Conversation, SmallConversation, conversationSchema };
+exports.Conversation = mongoose.model('Conversation', conversationSchema);
