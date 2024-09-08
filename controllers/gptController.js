@@ -361,7 +361,7 @@ async function getSuggestionPromptFromGPT(messages) {
       );
     } catch (error) {
       // console.error('Error during axios request:', error);
-      return res.status(500).json({ error: `Error from the GPT Service.` });
+      return [];
     }
 
     let prompts;
@@ -371,11 +371,7 @@ async function getSuggestionPromptFromGPT(messages) {
         prompts = JSON.parse(prompts);
       } catch (e) {
         console.error('Error parsing prompts:', e.message); // Debugging line
-        return {
-          status: 'fail',
-          content:
-            'Internal Server Error. Unexpected array format generated, please try generating again.',
-        };
+        return [];
       }
     }
     return {
@@ -444,13 +440,13 @@ exports.getSuggestionPrompt = async (req, res) => {
       }
       attempt++;
     }
-    
-    // Return the prompts
-    if (!prompts || prompts.length === 0) {
+    // If attempts exceed 3, return an error message
+    if (attempt >= 2) {
       return res.status(500).json({
-        error: 'Unable to generate prompts, please try  generating again.',
+        error: 'Unable to generate prompts, please try generating again.',
       });
     }
+    // Return the prompts
     serverResponse = {
       prompts: prompts,
     };
