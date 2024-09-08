@@ -235,7 +235,10 @@ exports.sendMainMessage = async (req, res) => {
       });
     }
     // Append the new user message to the conversation, which is the last element in the array
-    const newMessage = { role: 'user', content: userMessage[userMessage.length - 1].content};
+    const newMessage = {
+      role: 'user',
+      content: userMessage[userMessage.length - 1].content,
+    };
     conversation.messages.push(newMessage);
 
     // Check if user requested a range of date
@@ -281,9 +284,9 @@ exports.sendMainMessage = async (req, res) => {
         response_length: response_length,
         temperature: temperature,
         system_prompt:
-          "Act as a Financial Assistant, you can only answer questions or requests related to Money only, if it is not related. Please DO NOT ANSWER, instead, reply with 'Please only ask Financial questions related only'",
+          "Act as a Financial Assistant, you can only answer questions or requests related to Money only, if it is not related. Please DO NOT ANSWER, instead, reply with 'Please only ask Financial questions related only'. I will send you the transaction data in CSV format (the date is in ddmmyy format, but the output should explicitly tell which day it is), please use it to answer the user's questions.",
         precaution:
-          'REMEMBER: DO NOT ANSWER IF IT IS NOT RELATED TO MONEY, FINANCE, INVESTMENT, BANKING, OR ANYTHING RELATED, questions that are considered follow up to the above are allowed',
+          'give me personalized answers based on my transactions (also quotes your statements to my transactions). REMEMBER: DO NOT ANSWER IF IT IS NOT RELATED TO MONEY, FINANCE, INVESTMENT, BANKING, OR ANYTHING RELATED, questions that are considered follow up to the above are allowed',
       },
       messages: [
         ...userMessage.slice(0, -1), // All elements except the last one
@@ -294,11 +297,14 @@ exports.sendMainMessage = async (req, res) => {
     // Send POST request to external GPT service
     let response;
     try {
-      response = await axios.post('http://127.0.0.1:8000/api/test', payload);
+      response = await axios.post(
+        'http://127.0.0.1:8000/api/generate',
+        payload
+      );
     } catch (error) {
       return res.status(500).json({ error: `Error from the GPT Service.` });
     }
-    let message = response.data.content;  
+    let message = response.data.content;
     const conversationTitle = message.title;
     conversation.title = conversationTitle;
     const assistantMessage = {
@@ -328,7 +334,7 @@ async function getSuggestionPromptFromGPT(messages) {
     let payload_message = {
       role: 'user',
       content:
-        'Send me an array of 4 strings [,,,,], containing follow up questions related to the given text. They ALL must be brief, short, and related to the questions! E.g. What about, How do I, etc...',
+        'Send me an array of 4 strings [,,,,], containing follow up questions related to the given text. They ALL must be brief, short, and related to the questions! E.g. What about, How do I, etc... as personalized as possible, you should be aware of your own messages and your advices, as if you are interviewing your own answers',
     };
     // Append the new user message to the payload
     messages.push(payload_message);
@@ -339,7 +345,7 @@ async function getSuggestionPromptFromGPT(messages) {
         response_length: 'short',
         temperature: 0.2,
         system_prompt:
-          'You are a prompt generator, generate 4 follow up questions based on the above text, they all should be brief and succint, and related to the above text. Remember to keep them related to the above text, BUT DO NOT GENERATE PROMPTS THAT IS RELATED TO THE USER PROMPTS (hint: they all are topics about FINANCIAL, MONEY, INVESTING, etc...). E.g. What about, How do I, etc...',
+          'You are a prompt generator, generate 4 follow up questions based on the above text, as personalized as possible, you should be aware of your own messages and your advices, as if you are interviewing your own answers. They all should be brief and succint, and related to the above text, the questions should be in first person. Remember to keep them related to the above text, BUT DO NOT GENERATE PROMPTS THAT IS RELATED TO THE USER PROMPTS (hint: they all are topics about FINANCIAL, MONEY, INVESTING, etc...). E.g. What about, How do I, etc...',
         precaution:
           'Remember! Only send me an array of 4 strings contaning follow up questions related to all of the above text (hint: they all are topics about FINANCIAL, MONEY, INVESTING, etc...).',
       },
@@ -391,83 +397,55 @@ exports.getSuggestionPrompt = async (req, res) => {
     // const user = await User.findById(req.params.userId);
     if (!userId) return res.status(404).json({ error: 'User not found' });
 
-    // Check for request body for type
-    if (!req.body.type) {
-      return res.status(400).json({ error: 'Prompt type is required' });
-    }
-    if (
-      !['general', 'budget', 'transactions', 'goals'].includes(req.body.type)
-    ) {
-      return res.status(400).json({ error: 'Invalid prompt type' });
-    }
-    let results;
-    // If prompt type is general, check for req.body.conversation_id.
-    // If conversation_id is empty, return hard-coded prompts,
-    // otherwise, return prompts generated by GPT based on the conversation.
-    if (req.body.type === 'general') {
-      if (!req.body.conversation_id || req.body.conversation_id === '') {
-        return res.status(200).json({
-          prompts: [
-            'What are my top three financial goals for the next six months, and how am I progressing towards them?',
-            'How much do I need to save each month to reach my emergency fund target by the end of the year?',
-            'Are my current spending habits aligned with my long-term savings goals, such as buying a house or retirement?',
-            'What are the top three financial goals for the next six months, and how am I progressing towards them?',
-          ],
-        });
-      } else {
-        // Find the conversation for the given user
-        const conversation = await Conversation.findOne({
-          _id: req.body.conversation_id,
-          user: userId,
-        });
-        if (!conversation) {
-          return res.status(404).json({ error: 'Conversation not found' });
-        }
-        results = await getSuggestionPromptFromGPT(conversation.messages);
-      }
-    } else if (['budget', 'transactions', 'goals'].includes(req.body.type)) {
-      // Check if small conversation already exists
-      let small_conversation;
-      small_conversation = await SmallConversation.findOne({
-        user: userId,
+    let userMessage = req.body.messages;
+    const isValidMessage = (messages) => {
+      return (
+        Array.isArray(messages) &&
+        messages.every((item) => {
+          return (
+            typeof item === 'object' &&
+            (item.role === 'user' || item.role === 'assistant') &&
+            typeof item.content === 'string'
+          );
+        })
+      );
+    };
+
+    // If no messages are provided, return a default prompt
+    if (!userMessage) {
+      return res.status(200).json({
+        prompts: [
+          'What are my top three financial goals for the next six months, and how am I progressing towards them?',
+          'How much do I need to save each month to reach my emergency fund target by the end of the year?',
+          'Are my current spending habits aligned with my long-term savings goals, such as buying a house or retirement?',
+          'What are the top three financial goals for the next six months, and how am I progressing towards them?',
+        ],
       });
-      if (!small_conversation || small_conversation.messages.length === 0) {
-        // If no small conversation exists, check for params to return an array of 4 prompts
-        // Check if prompt Type is either 'budget', 'transactions', or 'goals'
-        switch (req.body.type) {
-          case 'budget':
-            return res.status(200).json({
-              prompts: ['Help me save the budget.', 'Hoho', 'Hehe', 'Haha'],
-            });
-          case 'transactions':
-            return res.status(200).json({
-              prompts: ['Haha', 'Hoho', 'Hehe', 'Hihi'],
-            });
-          case 'goals':
-            return res.status(200).json({
-              prompts: [
-                'What are my top three financial goals for the next six months, and how am I progressing towards them?',
-                'How much do I need to save each month to reach my emergency fund target by the end of the year?',
-                'Are my current spending habits aligned with my long-term savings goals, such as buying a house or retirement?',
-                'What are my top three financial goals for the next six months, and how am I progressing towards them?',
-              ],
-            });
-          default:
-            return res.status(400).json({ error: 'Invalid prompt type' });
-        }
+    }
+
+    // Check if received message is valid
+    if (!isValidMessage(userMessage)) {
+      return res.status(400).json({
+        error: 'Invalid message payload received.',
+      });
+    }
+
+    // Generate an array of 4 prompts based on the messages
+    let attempt = 0;
+    let prompts = [];
+    // Retry 3 times if the prompts are not generated successfully
+    while (attempt < 2) {
+      results = await getSuggestionPromptFromGPT(userMessage);
+
+      // // Check if the results are successful
+      prompts = results.content;
+      if (prompts && prompts.length === 4) {
+        break;
       }
-
-      // If small conversation exists, generate an array of 4 prompts based on small conversation messages
-      results = await getSuggestionPromptFromGPT(small_conversation.messages);
+      attempt++;
     }
-
-    // Check if the results are successful
-    if (results.status === 'fail') {
-      return res.status(500).json({ error: results.content });
-    }
-
+    
     // Return the prompts
-    const prompts = results.content;
     if (!prompts || prompts.length === 0) {
       return res.status(500).json({
         error: 'Unable to generate prompts, please try  generating again.',
