@@ -2,6 +2,7 @@ const { User } = require('../models/userModel');
 const { Conversation } = require('../models/gptModel');
 const { formatDate, parseDate } = require('../helpers/gptHelper');
 const axios = require('axios');
+const stream = require('stream');
 
 // Return a CSV string of sorted transactions
 async function getSortedTransactions(userId, startDateStr, endDateStr) {
@@ -177,7 +178,6 @@ exports.updateConversationSettings = async (req, res) => {
     res.status(500).json({ error: 'Could not update settings' });
   }
 };
-
 exports.sendMainMessage = async (req, res) => {
   try {
     const userId = req.user._id;
@@ -197,7 +197,6 @@ exports.sendMainMessage = async (req, res) => {
         })
       );
     };
-    // console.log(userMessage);
     if (!userMessage || !isValidMessage(userMessage)) {
       return res.status(400).json({
         error: 'Invalid message payload received.',
@@ -293,35 +292,63 @@ exports.sendMainMessage = async (req, res) => {
         userMessage[userMessage.length - 1], // The last element
       ],
     };
-    // Send POST request to external GPT service
-    let response;
-    try {
-      response = await axios.post(
-        'http://127.0.0.1:8000/api/generate',
-        payload
-      );
-    } catch (error) {
-      return res.status(500).json({ error: `Error from the GPT Service.` });
-    }
-    let message = response.data.content;
-    const conversationTitle = message.title;
-    conversation.title = conversationTitle;
-    const assistantMessage = {
-      role: message.role,
-      content: message.content,
-    };
-    conversation.messages.push(assistantMessage);
 
-    // Save the updated conversation
-    await conversation.save();
+    // Send POST request to external GPT service with streaming response
+    const response = await axios.post(
+      'http://127.0.0.1:8000/api/stream',
+      payload,
+      {
+        responseType: 'stream',
+      }
+    );
 
-    const serverResponse = {
-      conversationId: conversation.conversationId,
-      title: message.title,
-      content: message.content,
-    };
+    // Initialize variables to store the concatenated stream and title
+    let concatenatedStream = '';
+    let title = '';
+    response.data.on('data', (chunk) => {
+      const chunkString = chunk.toString();
+      const chunkJson = JSON.parse(chunkString);
 
-    res.status(200).send(serverResponse);
+      // Extract the content and concatenate it
+      if (chunkJson.content && chunkJson.content.content) {
+        concatenatedStream += chunkJson.content.content;
+      }
+
+      // Fetch the title from the first stream response
+      if (!title && chunkJson.content && chunkJson.content.title) {
+        title = chunkJson.content.title;
+      }
+
+      res.write(chunkString);
+    });
+
+    response.data.on('end', async () => {
+      res.end();
+
+      // Create the assistantMessage object
+      const assistantMessage = {
+        role: 'assistant',
+        content: concatenatedStream,
+      };
+
+      // Push the assistantMessage to the conversation messages
+      conversation.messages.push(assistantMessage);
+
+      // Update the conversation title if it was fetched
+      if (title) {
+        conversation.title = title;
+      }
+
+      // Save the conversation
+      await conversation.save();
+    });
+
+    response.data.on('error', (error) => {
+      console.error('Error in streaming response:', error.message);
+      res
+        .status(500)
+        .json({ error: 'Error in streaming response from GPT Service.' });
+    });
   } catch (error) {
     console.error(error.message);
     res.status(500).json({ error: 'Server error' });
