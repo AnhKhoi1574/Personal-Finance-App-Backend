@@ -15,8 +15,8 @@ exports.getUserProfile = async (req, res) => {
       });
     }
 
-      // Remove the password before returning the user data
-      user.password = undefined;
+    // Remove the password before returning the user data
+    user.password = undefined;
 
     res.status(200).json({
       status: 'success',
@@ -25,13 +25,13 @@ exports.getUserProfile = async (req, res) => {
       },
     });
   } catch (err) {
-    res.status(400).json({
-      status: 'fail',
-      message: err.message,
+    res.status(500).json({
+      status: 'error',
+      message: 'An error occurred while retrieving user profile',
+      error: err.message,
     });
   }
 };
-
 
 exports.updateUserProfile = async (req, res) => {
   try {
@@ -64,14 +64,16 @@ exports.updateUserProfile = async (req, res) => {
 
     res.status(200).json({
       status: 'success',
+      message: 'User profile updated successfully',
       data: {
         user,
       },
     });
   } catch (err) {
-    res.status(400).json({
-      status: 'fail',
-      message: err.message,
+    res.status(500).json({
+      status: 'error',
+      message: 'An error occurred while updating user profile',
+      error: err.message,
     });
   }
 };
@@ -95,10 +97,10 @@ exports.deleteUserProfile = async (req, res) => {
       data: null,
     });
   } catch (err) {
-    res.status(400).json({
-      status: 'fail',
-      message: err.message,
+    res.status(500).json({
+      status: 'error',
+      message: 'An error occurred while deleting the user profile',
+      error: err.message,
     });
   }
 };
-

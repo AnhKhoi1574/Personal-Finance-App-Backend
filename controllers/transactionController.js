@@ -4,57 +4,96 @@ const {
 } = require('../models/transactionModel');
 const { User } = require('../models/userModel');
 
-// Create transaction
+// Create transaction(with Automatic Savings)
 exports.createTransaction = async (req, res) => {
   try {
-    // Extract transaction details and user ID from the request body
-    const { date, type, category, transactionAmount, title } = req.body;
+    const userId = req.user._id;
+    const { date, type, transactionAmount, category, title } = req.body;
 
-    // Validate the transaction data
-    const { error } = validateTransaction(req.body);
+    // Validate input with Joi
+    const { error } = validateTransaction({
+      date: new Date(),
+      type,
+      category,
+      transactionAmount,
+      title,
+    });
     if (error) {
-      return res
-        .status(400)
-        .json({ status: 'fail', message: error.details[0].message });
+      return res.status(400).json({
+        status: 'error',
+        message: error.details[0].message,
+      });
     }
 
-    // Find the user by ID
-    const user = await User.findById(req.user._id);
+    // Find the user by ID and populate saving data
+    const user = await User.findById(userId).populate('saving');
     if (!user) {
       return res
         .status(404)
-        .json({ status: 'fail', message: 'User not found' });
+        .json({ status: 'error', message: 'User not found' });
     }
 
-    // Create a new transaction
+    let actualTransactionAmount = transactionAmount;
+
+    // Create the transaction
     const newTransaction = new Transaction({
       date,
       type,
       category,
       transactionAmount,
       title,
+      isSavingsTransfer: false,
     });
 
-    // Add the transaction to the user's transactions array
+    // Handle automatic savings if the transaction is of type 'income'
+    if (
+      type === 'income' &&
+      user.saving &&
+      user.saving.isAutoSavingEnabled &&
+      user.saving.autoSavingPercentage > 0
+    ) {
+      const savingAmount =
+        (transactionAmount * user.saving.autoSavingPercentage) / 100;
+
+      user.saving.currentAmount += savingAmount;
+      actualTransactionAmount -= savingAmount;
+
+      // Create a corresponding savings transaction
+      const savingTransaction = new Transaction({
+        date: new Date(),
+        type: 'expense',
+        category: 'saving',
+        transactionAmount: savingAmount,
+        title: 'Saving from income',
+        isSavingsTransfer: true,
+      });
+
+      // Add the savings transaction to the user's transactions
+      user.transactions.push(savingTransaction);
+    }
+
+    // Add the new transaction to the user's transactions
     user.transactions.push(newTransaction);
+
+    // Update the user's current balance
+    user.currentBalance +=
+      type === 'income' ? actualTransactionAmount : -transactionAmount;
 
     // Save the updated user document
     await user.save();
 
-    // Send a success response with the updated user data
+    // Respond with the newly created transaction
     res.status(201).json({
       status: 'success',
-      data: {
-        newTransaction,
-      },
+      message: 'Transaction created successfully',
+      data: newTransaction,
     });
-  } catch (err) {
-    // Handle any errors during the process
+  } catch (error) {
     res.status(500).json({
       status: 'error',
       message: 'An error occurred while creating the transaction',
+      error: error.message,
     });
-    console.log(err);
   }
 };
 
@@ -87,12 +126,13 @@ exports.getAllTransactions = async (req, res) => {
 
     let transactions = user.transactions;
 
-    // Apply filtering by type and category
-    if (type || category) {
+    if (type || category || typeof isSavingsTransfer !== 'undefined') {
       transactions = transactions.filter((transaction) => {
         return (
           (!type || transaction.type === type) &&
-          (!category || transaction.category === category)
+          (!category || transaction.category === category) &&
+          (typeof isSavingsTransfer === 'undefined' ||
+            transaction.isSavingsTransfer === (isSavingsTransfer === 'true'))
         );
       });
     }
@@ -202,12 +242,44 @@ exports.updateTransaction = async (req, res) => {
       });
     }
 
+    // Reverse the effects of the existing transaction on balance and saving
+    if (transaction.isSavingsTransfer) {
+      if (transaction.type === 'income') {
+        user.currentBalance -= transaction.transactionAmount;
+        user.saving.currentAmount -= transaction.transactionAmount;
+      } else {
+        user.currentBalance += transaction.transactionAmount;
+        user.saving.currentAmount -= transaction.transactionAmount;
+      }
+    } else {
+      user.currentBalance +=
+        transaction.type === 'income'
+          ? -transaction.transactionAmount
+          : transaction.transactionAmount;
+    }
+
     // Update the transaction fields
     if (date) transaction.date = date;
     if (type) transaction.type = type;
     if (category) transaction.category = category;
     if (transactionAmount) transaction.transactionAmount = transactionAmount;
     if (title) transaction.title = title;
+
+    // Apply the new transaction effects to balance and saving
+    if (transaction.isSavingsTransfer) {
+      if (transaction.type === 'income') {
+        user.currentBalance += transaction.transactionAmount;
+        user.saving.currentAmount += transaction.transactionAmount;
+      } else {
+        user.currentBalance -= transaction.transactionAmount;
+        user.saving.currentAmount += transaction.transactionAmount;
+      }
+    } else {
+      user.currentBalance +=
+        transaction.type === 'income'
+          ? transaction.transactionAmount
+          : -transaction.transactionAmount;
+    }
 
     // Save the updated user document
     await user.save();
@@ -237,9 +309,7 @@ exports.deleteTransaction = async (req, res) => {
     // Find the user by ID
     const user = await User.findById(req.user._id);
     if (!user) {
-      return res
-        .status(404)
-        .json({ status: 'fail', message: 'User not found' });
+      return res.status(404).json({ status: 'fail', message: 'User not found' });
     }
 
     // Find the transaction in the user's transactions array
@@ -248,9 +318,31 @@ exports.deleteTransaction = async (req, res) => {
     );
 
     if (transactionIndex === -1) {
-      return res
-        .status(404)
-        .json({ status: 'fail', message: 'Transaction not found' });
+      return res.status(404).json({ status: 'fail', message: 'Transaction not found' });
+    }
+
+    // Get the transaction to be deleted
+    const transactionToDelete = user.transactions[transactionIndex];
+
+    // Adjust the current balance and saving amount based on the transaction type and whether it's a savings transfer
+    if (transactionToDelete.isSavingsTransfer) {
+      if (transactionToDelete.type === 'income') {
+        // Undo an income transfer from savings to current balance
+        user.currentBalance -= transactionToDelete.transactionAmount;
+        user.saving.currentAmount += transactionToDelete.transactionAmount;
+      } else if (transactionToDelete.type === 'expense') {
+        // Undo an expense transfer from current balance to savings
+        user.currentBalance += transactionToDelete.transactionAmount;
+        user.saving.currentAmount -= transactionToDelete.transactionAmount;
+      }
+    } else {
+      if (transactionToDelete.type === 'income') {
+        // Undo an income transaction (add back the amount to current balance)
+        user.currentBalance -= transactionToDelete.transactionAmount;
+      } else if (transactionToDelete.type === 'expense') {
+        // Undo an expense transaction (subtract the amount from current balance)
+        user.currentBalance += transactionToDelete.transactionAmount;
+      }
     }
 
     // Remove the transaction from the user's transactions array
@@ -260,7 +352,7 @@ exports.deleteTransaction = async (req, res) => {
     await user.save();
 
     // Send a success response
-    res.status(204).json({
+    res.status(200).json({
       status: 'success',
       message: 'Transaction deleted successfully',
     });
@@ -272,3 +364,5 @@ exports.deleteTransaction = async (req, res) => {
     });
   }
 };
+
+
