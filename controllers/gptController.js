@@ -263,14 +263,6 @@ exports.sendMainMessage = async (req, res) => {
         .json({ error: 'Invalid start_date or end_date format received' });
     }
 
-    // Temporary message to include user's transactions as CSV string, so that GPT can understand user's financial data
-    let transactionData = {
-      role: 'user',
-      content:
-        'IGNORE PREVIOUS TRANSACTIONS. This is my UPDATED transaction data in CSV format' +
-        (await getSortedTransactions(userId, startDate, endDate)),
-    };
-
     // Prepare the payload
     let response_length =
       req.body.settings?.response_length ||
@@ -282,15 +274,11 @@ exports.sendMainMessage = async (req, res) => {
         response_length: response_length,
         temperature: temperature,
         system_prompt:
-          "Act as a Financial Assistant, you can only answer questions or requests related to Money only, if it is not related. Please DO NOT ANSWER, instead, reply with 'Please only ask Financial questions related only'. I will send you the transaction data in CSV format (the date is in ddmmyy format, but the output should explicitly tell which day it is), please use it to answer the user's questions.",
+          "Act as a Financial Assistant, you can only answer questions or requests related to Money only, if it is not related. Please DO NOT ANSWER, instead, reply with 'Please only ask Financial questions related only'. I will send you the transaction data in CSV format (the date is in ddmmyy format, but the output should explicitly tell which day it is), please use it to answer the user's questions, $ signs accepted only. My transaction data is in CSV format: " + (await getSortedTransactions(userId, startDate, endDate)),
         precaution:
-          'give me personalized answers based on my transactions (also quotes your statements to my transactions). REMEMBER: DO NOT ANSWER IF IT IS NOT RELATED TO MONEY, FINANCE, INVESTMENT, BANKING, OR ANYTHING RELATED, questions that are considered follow up to the above are allowed',
+          '. Give me personalized answers based on my transactions (also quotes your statements to my transactions) as well as keep in mind CSV data, they are updated occasionally. REMEMBER: DO NOT ANSWER IF IT IS NOT RELATED TO MONEY, FINANCE, INVESTMENT, BANKING, OR ANYTHING RELATED, questions that are considered follow up to the above are allowed',
       },
-      messages: [
-        ...userMessage.slice(0, -1), // All elements except the last one
-        transactionData, // The transaction data to inject
-        userMessage[userMessage.length - 1], // The last element
-      ],
+      messages: userMessage,
     };
 
     // Send POST request to external GPT service with streaming response
