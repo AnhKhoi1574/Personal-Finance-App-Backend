@@ -1,60 +1,9 @@
-const { User } = require('../models/userModel');
 const { Conversation } = require('../models/gptModel');
-const { formatDate, parseDate } = require('../helpers/gptHelper');
+const {
+  getSortedTransactions,
+  getSavingDetails,
+} = require('../helpers/gptHelper');
 const axios = require('axios');
-const stream = require('stream');
-
-// Return a CSV string of sorted transactions
-async function getSortedTransactions(userId, startDateStr, endDateStr) {
-  try {
-    const user = await User.findById(userId).populate('transactions');
-    if (!user) {
-      throw new Error('User not found');
-    }
-
-    let startDate, endDate;
-    if (startDateStr) {
-      startDate = parseDate(startDateStr);
-    }
-    if (endDateStr) {
-      endDate = parseDate(endDateStr);
-    }
-
-    const filteredTransactions = user.transactions.filter((transaction) => {
-      const transactionDate = new Date(transaction.date);
-      if (startDate && endDate) {
-        return transactionDate >= startDate && transactionDate <= endDate;
-      } else if (startDate) {
-        return transactionDate >= startDate;
-      } else if (endDate) {
-        return transactionDate <= endDate;
-      } else {
-        return true; // No date filters applied
-      }
-    });
-
-    const sortedTransactions = filteredTransactions.sort(
-      (a, b) => new Date(a.date) - new Date(b.date)
-    );
-
-    const csvTransactions = sortedTransactions
-      .map(
-        (transaction) =>
-          `${formatDate(transaction.date)},${transaction.type},${
-            transaction.category
-          },${transaction.title},${transaction.transactionAmount}$`
-      )
-      .join('\n');
-
-    const csvHeader = 'date(ddmmyy),type,category,title,transaction amount';
-    const csvString = `${csvHeader}\n${csvTransactions}`;
-
-    return csvString;
-  } catch (error) {
-    console.error(error);
-    throw error;
-  }
-}
 
 exports.getAllConversations = async (req, res) => {
   try {
@@ -263,7 +212,44 @@ exports.sendMainMessage = async (req, res) => {
         .json({ error: 'Invalid start_date or end_date format received' });
     }
 
-    // Prepare the payload
+    // Prepare the data for the payload
+    // Get current date
+    let currentDate = new Date().toLocaleDateString('en-GB', {
+      day: 'numeric',
+      month: 'long',
+      year: 'numeric',
+    });
+
+    // Get current transactions
+    let sortedTransactions = await getSortedTransactions(
+      userId,
+      startDate,
+      endDate
+    );
+
+    // Get saving details
+    let savingDetails = await getSavingDetails(userId);
+    let savingDetailsString = '';
+    if (savingDetails != null) {
+      savingDetailsString =
+        "The saving goal's name: " +
+        savingDetails.name +
+        "; goal's current amount (money accumulated in the goal): " +
+        savingDetails.currentAmount +
+        "; goal's target amount (the target that needs to be achieved): " +
+        savingDetails.targetAmount +
+        "; the goal's target date (I want to complete my saving goal before this date): " +
+        savingDetails.targetDate;
+      if (savingDetails.isAutoSavingEnabled === true) {
+        savingDetailsString +=
+          '; the percentage that is automatically deducted from my income when I add them ' +
+          savingDetails.autoSavingPercentage +
+          '.';
+      } else {
+        savingDetailsString += '.';
+      }
+    }
+
     let response_length =
       req.body.settings?.response_length ||
       conversation.settings.response_length;
@@ -274,9 +260,13 @@ exports.sendMainMessage = async (req, res) => {
         response_length: response_length,
         temperature: temperature,
         system_prompt:
-          "Act as a Financial Assistant, you can only answer questions or requests related to Money only, if it is not related. Please DO NOT ANSWER, instead, reply with 'Please only ask Financial questions related only'. I will send you the transaction data in CSV format (the date is in ddmmyy format, but the output should explicitly tell which day it is), please use it to answer the user's questions, $ signs accepted only. My transaction data is in CSV format: " + (await getSortedTransactions(userId, startDate, endDate)),
-        precaution:
-          '. Give me personalized answers based on my transactions (also quotes your statements to my transactions) as well as keep in mind CSV data, they are updated occasionally. REMEMBER: DO NOT ANSWER IF IT IS NOT RELATED TO MONEY, FINANCE, INVESTMENT, BANKING, OR ANYTHING RELATED, questions that are considered follow up to the above are allowed',
+          "Act as a Financial Assistant, you will give me answers to any questions or requests. There are important notes you should be aware of before answering:\n- The question or requests should only be related to money, investing, mortgage, etc... anything finance-related. If the question/request considerably goes out of these scopes, refuse to reply.\n- Your answer should be in correlation of these things: the current date, the transactions data (in CSV format), and the saving goal's name/amount. You should be aware of them to give a personalized answer, while also quoting your statements to the data given (e.g. Transactions details, etc). Be sure to always check the given data as they will be updated occasionally, keeping the balance between the relevancy of the data and the previous responses.\n" +
+          'The current date is: ' +
+          currentDate +
+          '\n' +
+          savingDetailsString +
+          'The transactions data is:\n' +
+          sortedTransactions,
       },
       messages: userMessage,
     };
