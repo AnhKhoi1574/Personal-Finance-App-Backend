@@ -1,3 +1,9 @@
+const axios = require('axios');
+const {
+  Transaction,
+  validateTransaction,
+} = require('../models/transactionModel');
+const { createTransactionHelper } = require('../helpers/transactionHelper');
 const { User } = require('../models/userModel');
 
 function formatDate(date) {
@@ -114,4 +120,68 @@ async function getSavingDetails(userId) {
   }
 }
 
-module.exports = { getSortedTransactions, getSavingDetails };
+async function gptAddTransaction(userId, message) {
+  try {
+    // Get array of JSONs from GPT
+    // Get current date and time
+    let currentDateAndTime = new Date().toLocaleDateString('en-GB', {
+      day: 'numeric',
+      month: 'long',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+    });
+    const payload = {
+      settings: {
+        response_length: 'medium',
+        temperature: 0.4,
+        system_prompt:
+          'You are a JSON generator, I will give you details about my transactions, your job is to identify exactly what the user is trying to add, and fill in the missing data appropriately (e.g. deciding which category, or which transaction title is descriptive), then provide an array of JSONs containing:\n- date(string): in this example format "2024-09-13T01:20" (year-month-date-hour-minute), if time is not specified, always assume. Note that currently its' +
+          currentDateAndTime +
+          'at 3:04AM\n- type(string): either "income" or "expense"\n- category(string): if type is "income" then must be only "Income"; if type is "expense" then must be one of these: "Household", "Shopping", "Food", "Utilities", "Transportation", "Others" (category must capitalize the begin of char).\n- transactionAmount(float): the amount of the item, in float or integer e.g. 10 or 10.5\n- title(string): the descriptive title of the transaction (do not make it too generic, but also do not hallucinate): e.g. Groceries (items...), Movie ticket for <film name>, A date, etc\n\nExample:\n-Input: I went to the groceries store yesterday to grab some chickens after gym, it costed me 20$ for 10 thighs of chickens. And I got fined 100$ by a police for running a red light. Luckily, my boss gave me rewards for being so nice to him, he gave me 150$.\n-Your Output (Exactly as followed without any format, plaintext):\n[{"date": <you decide>, "type": "expense","category": "Food","transactionAmount": 20,"title": <You decide>}, {<2nd item>}, {<3rd item>}]',
+      },
+      messages: [{ role: 'user', content: message }],
+    };
+
+    let response;
+    response = await axios.post('http://127.0.0.1:8000/api/generate', payload);
+    let json_data = await JSON.parse(response.data.content.content);
+    // Sample JSON
+    // Check if the JSON received is valid
+    const isValid =
+      Array.isArray(json_data) &&
+      json_data.every(
+        (item) =>
+          typeof item.date === 'string' &&
+          typeof item.type === 'string' &&
+          typeof item.category === 'string' &&
+          typeof item.transactionAmount === 'number' &&
+          typeof item.title === 'string'
+      );
+
+    if (!isValid) {
+      // console.log('Failed check!');
+      return false;
+    }
+
+    for (const transaction of json_data) {
+      // Add the transaction to the database
+      createTransactionHelper(
+        userId,
+        transaction.date,
+        transaction.type,
+        transaction.transactionAmount,
+        transaction.category,
+        transaction.title
+      );
+    }
+    return response.data.content.content;
+  } catch (error) {
+    console.log(error);
+    return false;
+  }
+}
+// gptAddTransaction("66cacdbf5280abd4f2fab918",
+//       'I went to Hogwarts one last time for 1 coin (10 dollars) today'
+//     );
+module.exports = { getSortedTransactions, getSavingDetails, gptAddTransaction };
