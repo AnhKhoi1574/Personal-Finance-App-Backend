@@ -35,7 +35,7 @@ const createSendToken = (user, statusCode, res) => {
 // Async callback function for user registration
 exports.register = async (req, res) => {
   try {
-    const { name, email, password, birthday, currentBalance  } = req.body;
+    const { name, email, password, birthday, currentBalance } = req.body;
 
     // Create a salt
     const salt = await bcrypt.genSalt(12);
