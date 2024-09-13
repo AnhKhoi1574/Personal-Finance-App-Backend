@@ -3,121 +3,20 @@ const {
   validateTransaction,
 } = require('../models/transactionModel');
 const { User } = require('../models/userModel');
+const { createTransactionHelper } = require('../helpers/transactionHelper');
 
-// Create transaction (with Automatic Savings and Budget Integration)
+// Create transaction(with Automatic Savings)
 exports.createTransaction = async (req, res) => {
   try {
     const userId = req.user._id;
     const { date, type, transactionAmount, category, title } = req.body;
 
-    // Validate input with Joi
-    const { error } = validateTransaction({
-      date: new Date(),
-      type,
-      category,
-      transactionAmount,
-      title,
-    });
-    if (error) {
-      return res.status(400).json({
-        status: 'error',
-        message: error.details[0].message,
-      });
-    }
-
-    // Find the user by ID and populate saving and budget data
-    const user = await User.findById(userId).populate('saving');
-    if (!user) {
-      return res
-        .status(404)
-        .json({ status: 'error', message: 'User not found' });
-    }
-
-    let actualTransactionAmount = transactionAmount;
-    let savingAmount = 0;
-
-    // Handle automatic savings if the transaction is of type 'income'
-    if (
-      type === 'income' &&
-      user.saving &&
-      user.saving.isAutoSavingEnabled &&
-      user.saving.autoSavingPercentage > 0
-    ) {
-      savingAmount =
-        (transactionAmount * user.saving.autoSavingPercentage) / 100;
-
-      // Calculate potential new saving amount
-      const potentialNewSavingAmount = user.saving.currentAmount + savingAmount;
-
-      // If the potential new saving amount exceeds the target amount, adjust the saving amount
-      if (potentialNewSavingAmount > user.saving.targetAmount) {
-        const allowableSavingAmount =
-          user.saving.targetAmount - user.saving.currentAmount;
-        user.saving.currentAmount += allowableSavingAmount;
-        actualTransactionAmount -= allowableSavingAmount;
-        savingAmount = allowableSavingAmount; // Update savingAmount to reflect the actual amount added
-      } else {
-        user.saving.currentAmount += savingAmount;
-        actualTransactionAmount -= savingAmount;
-      }
-
-      // Create a corresponding savings transaction with the same date as the income transaction
-      const savingTransaction = new Transaction({
-        date, // Set the same date as the user-entered income transaction
-        type: 'expense',
-        category: 'saving',
-        transactionAmount: savingAmount, // Use the adjusted savingAmount
-        title: 'Saving from income',
-        isSavingsTransfer: true,
-      });
-
-      // Add the savings transaction to the user's transactions
-      user.transactions.push(savingTransaction);
-
-      // Adjust the budget if the budget exists and the category is 'saving'
-      if (user.budget && user.budget.categories.saving) {
-        user.budget.categories.saving.spent += savingAmount;
-      }
-    }
-
-    // Create the main transaction
-    const newTransaction = new Transaction({
-      date, // Use the user-provided date for the income transaction
-      type,
-      category,
-      transactionAmount: actualTransactionAmount, // Save the actual amount after savings cut-off
-      title,
-      isSavingsTransfer: false,
-    });
-
-    // Add the new transaction to the user's transactions
-    user.transactions.push(newTransaction);
-
-    // Update the user's current balance
-    user.currentBalance +=
-      type === 'income' ? actualTransactionAmount : -transactionAmount;
-
-    // Adjust the budget if it's an expense transaction and falls within the current budget period
-    if (
-      type === 'expense' &&
-      user.budget &&
-      new Date(date) >= new Date(user.budget.startDate) &&
-      new Date(date) <= new Date(user.budget.deadline) &&
-      user.budget.categories[category]
-    ) {
-      user.budget.categories[category].spent += actualTransactionAmount;
-    }
-
-    // Save the updated user document
-    await user.save();
-
-    // Respond with the newly created transaction, showing the actual transaction amount
+    newTransaction = createTransactionHelper(userId, date, type, transactionAmount, category, title);
+    // Respond with the newly created transaction
     res.status(201).json({
       status: 'success',
       message: 'Transaction created successfully',
-      data: {
-        transaction: newTransaction,
-      },
+      data: newTransaction,
     });
   } catch (error) {
     res.status(500).json({
