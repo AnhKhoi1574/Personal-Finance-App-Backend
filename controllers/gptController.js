@@ -10,16 +10,12 @@ const axios = require('axios');
 exports.getAllConversations = async (req, res) => {
   try {
     const userId = req.user._id;
-    const page = parseInt(req.query.page) || 1;
-    const limit = parseInt(req.query.limit) || 7;
-    const skip = (page - 1) * limit;
 
     const conversations = await Conversation.find(
       { user: userId },
       '_id title createdAt'
     )
-      .skip(skip)
-      .limit(limit)
+      .sort({ createdAt: -1 }) // Ensure sorting order is maintained
       .exec();
 
     const transformedConversations = conversations.map((conversation) => ({
@@ -31,12 +27,9 @@ exports.getAllConversations = async (req, res) => {
     const totalConversations = await Conversation.countDocuments({
       user: userId,
     }).exec();
-    const totalPages = Math.ceil(totalConversations / limit);
 
     res.json({
       conversations: transformedConversations,
-      currentPage: page,
-      totalPages,
       totalConversations,
     });
   } catch (error) {
@@ -249,7 +242,6 @@ exports.sendMainMessage = async (req, res) => {
         };
       } else {
         // Stream hardcoded response
-        console.log('wtf?');
         const hardcodedResponse = JSON.stringify({
           content: {
             content: 'Unknown command received, please try again',
@@ -309,8 +301,6 @@ exports.sendMainMessage = async (req, res) => {
         endDate,
         false
       );
-
-      console.log(sortedTransactions);
 
       // Get saving details
       let savingDetails = await getSavingDetails(userId);
