@@ -3,7 +3,7 @@ const {
   validateTransaction,
 } = require('../models/transactionModel');
 const { User } = require('../models/userModel');
-const { createTransactionHelper } = require('../helpers/transactionHelper');
+const { createTransactionHelper, updateTransactionHelper } = require('../helpers/transactionHelper');
 
 // Create transaction(with Automatic Savings)
 exports.createTransaction = async (req, res) => {
@@ -154,68 +154,21 @@ exports.updateTransaction = async (req, res) => {
     const transactionId = req.params.transactionId;
     const { date, type, category, transactionAmount, title } = req.body;
 
-    // Find the user by ID
-    const user = await User.findById(userId);
-    if (!user) {
-      return res.status(404).json({
-        status: 'fail',
-        message: 'User not found',
-      });
-    }
-
-    // Find the transaction by ID within the user's transactions array
-    const transaction = user.transactions.id(transactionId);
-    if (!transaction) {
-      return res.status(404).json({
-        status: 'fail',
-        message: 'Transaction not found',
-      });
-    }
-
-    // Prevent updating saving transactions
-    if (transaction.isSavingsTransfer) {
-      return res.status(403).json({
-        status: 'fail',
-        message: 'Saving transactions cannot be updated',
-      });
-    }
-
-    // Reverse the effects of the existing transaction on balance and saving amount
-    if (transaction.type === 'income') {
-      user.currentBalance -= transaction.transactionAmount;
-    } else if (transaction.type === 'expense') {
-      user.currentBalance += transaction.transactionAmount;
-      if (user.budget && user.budget.categories[transaction.category]) {
-        user.budget.categories[transaction.category].spent -=
-          transaction.transactionAmount;
-      }
-    }
-
-    // Update the transaction fields
-    if (date) transaction.date = date;
-    if (type) transaction.type = type;
-    if (category) transaction.category = category;
-    if (transactionAmount) transaction.transactionAmount = transactionAmount;
-    if (title) transaction.title = title;
-
-    // Apply the new transaction effects to balance and budget
-    if (type === 'income') {
-      user.currentBalance += transactionAmount;
-    } else if (type === 'expense') {
-      user.currentBalance -= transactionAmount;
-      if (user.budget && user.budget.categories[category]) {
-        user.budget.categories[category].spent += transactionAmount;
-      }
-    }
-
-    // Save the updated user document
-    await user.save();
+    const updatedTransaction = await updateTransactionHelper(
+      userId,
+      transactionId,
+      date,
+      type,
+      category,
+      transactionAmount,
+      title
+    );
 
     // Send a success response with the updated transaction data
     res.status(200).json({
       status: 'success',
       data: {
-        transaction,
+        updatedTransaction,
       },
     });
   } catch (err) {

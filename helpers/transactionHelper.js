@@ -91,4 +91,70 @@ async function createTransactionHelper(
   }
 }
 
-module.exports = { createTransactionHelper };
+async function updateTransactionHelper(
+  userId,
+  transactionId,
+  date,
+  type,
+  category,
+  transactionAmount,
+  title
+) {
+  try {
+    console.log(userId)
+    // Find the user by ID
+    const user = await User.findById(userId);
+    if (!user) {
+      throw new Error('User not found');
+    }
+
+    // Find the transaction by ID within the user's transactions array
+    const transaction = user.transactions.id(transactionId);
+    if (!transaction) {
+      throw new Error('Transaction not found');
+    }
+
+    // Prevent updating saving transactions
+    if (transaction.isSavingsTransfer) {
+      throw new Error('Saving transactions cannot be updated');
+    }
+
+    // Reverse the effects of the existing transaction on balance and saving amount
+    if (transaction.type === 'income') {
+      user.currentBalance -= transaction.transactionAmount;
+    } else if (transaction.type === 'expense') {
+      user.currentBalance += transaction.transactionAmount;
+      if (user.budget && user.budget.categories[transaction.category]) {
+        user.budget.categories[transaction.category].spent -=
+          transaction.transactionAmount;
+      }
+    }
+
+    // Update the transaction fields
+    if (date) transaction.date = date;
+    if (type) transaction.type = type;
+    if (category) transaction.category = category;
+    if (transactionAmount) transaction.transactionAmount = transactionAmount;
+    if (title) transaction.title = title;
+
+    // Apply the new transaction effects to balance and budget
+    if (type === 'income') {
+      user.currentBalance += transactionAmount;
+    } else if (type === 'expense') {
+      user.currentBalance -= transactionAmount;
+      if (user.budget && user.budget.categories[category]) {
+        user.budget.categories[category].spent += transactionAmount;
+      }
+    }
+
+    // Save the updated user document
+    await user.save();
+
+    return transaction;
+  } catch (error) {
+    console.log(error);
+    throw new Error('An error occurred while updating the transaction');
+  }
+}
+
+module.exports = { createTransactionHelper, updateTransactionHelper };
