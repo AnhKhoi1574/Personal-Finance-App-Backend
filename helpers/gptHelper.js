@@ -132,7 +132,7 @@ async function getSavingDetails(userId) {
   }
 }
 
-async function gptAddTransaction(userId, message) {
+async function gptAddTransaction(userId, messages) {
   try {
     // Get array of JSONs from GPT
     // Get current date and time
@@ -152,7 +152,7 @@ async function gptAddTransaction(userId, message) {
           currentDateAndTime +
           'at 3:04AM\n- type(string): either "income" or "expense"\n- category(string): if type is "income" then must be only "Income"; if type is "expense" then must be one of these: "Household", "Shopping", "Food", "Utilities", "Transportation", "Others" (category must capitalize the begin of char).\n- transactionAmount(float): the amount of the item, in float or integer e.g. 10 or 10.5\n- title(string): the descriptive title of the transaction (do not make it too generic, but also do not hallucinate): e.g. Groceries (items...), Movie ticket for <film name>, A date, etc\n\nExample:\n-Input: I went to the groceries store yesterday to grab some chickens after gym, it costed me 20$ for 10 thighs of chickens. And I got fined 100$ by a police for running a red light. Luckily, my boss gave me rewards for being so nice to him, he gave me 150$.\n-Your Output (Exactly as followed without any format, plaintext):\n[{"date": <you decide>, "type": "expense","category": "Food","transactionAmount": 20,"title": <You decide>}, {<2nd item>}, {<3rd item>}]. NOTE: If you do not understand, return empty array [].',
       },
-      messages: [{ role: 'user', content: message }],
+      messages: messages,
     };
 
     let response;
@@ -261,6 +261,7 @@ async function gptUpdateTransaction(userId, messages) {
     return false;
   }
 }
+
 // gptAddTransaction("66cacdbf5280abd4f2fab918",
 //       'I went to Hogwarts one last time for 1 coin (10 dollars) today'
 //     );

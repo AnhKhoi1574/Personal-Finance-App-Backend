@@ -194,7 +194,7 @@ exports.sendMainMessage = async (req, res) => {
         let json_data = false;
         let loopCount = 0;
         for (let i = 0; i < 5; i++) {
-          json_data = await gptAddTransaction(userId, lastMessage.content);
+          json_data = await gptAddTransaction(userId, userMessage);
           loopCount++;
           if (json_data) {
             break;
