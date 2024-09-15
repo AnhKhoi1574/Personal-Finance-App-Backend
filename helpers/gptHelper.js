@@ -2,6 +2,7 @@ const axios = require('axios');
 const {
   createTransactionHelper,
   updateTransactionHelper,
+  deleteTransactionHelper,
 } = require('../helpers/transactionHelper');
 const { User } = require('../models/userModel');
 
@@ -221,7 +222,6 @@ async function gptUpdateTransaction(userId, messages) {
 
     let response;
     response = await axios.post('http://127.0.0.1:8000/api/generate', payload);
-    console.log(response.data.content.content);
     let json_data = await JSON.parse(response.data.content.content);
 
     // Check if the JSON received is valid
@@ -262,6 +262,62 @@ async function gptUpdateTransaction(userId, messages) {
   }
 }
 
+async function gptDeleteTransaction(userId, messages) {
+  try {
+    let currentDateAndTime = new Date().toLocaleDateString('en-GB', {
+      day: 'numeric',
+      month: 'long',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+    });
+
+    let sortedTransactions = await getSortedTransactions(userId, '', '', true);
+
+    const payload = {
+      settings: {
+        response_length: 'medium',
+        temperature: 0.4,
+        system_prompt:
+          'You are a JSON generator, I will give you a CSV of transactions, your job is to lookup for the ID in that CSV data, and give me the ID of the transaction I want to delete the info from, then generate an array of JSON in plaintext (IMPORTANT: no extra messages, symbol) so I can use my API to delete it. Note that currently its ' +
+          currentDateAndTime +
+          ' the format:\n- id (string): got by looking up the CSV data\n- transactionAmount (float): say how much it is\n- date (string): in this format dd-mm-yy (e.g. 10 September 2024)\n- title (string): say the title\n\nImportant Example:\nUser: /create I went to the club the other day for 30$\nYou: Done! I have added 1 entries to your account: Expenses: 13th September 2024: Club party, 30$\nUser: Sorry, I made a mistake, please delete it\nYour exact output: [{"id": <id got from CSV>, "date": "23 September 2024", "title": <title>, "transactionAmount": <amount>}]\n\nNOTE: IF NO TRANSACTION IS FOUND THEN return empty array [].\n\nMy CSV transactions: ' +
+          sortedTransactions,
+      },
+      messages: messages,
+    };
+
+    let response;
+    response = await axios.post('http://127.0.0.1:8000/api/generate', payload);
+    let json_data = await JSON.parse(response.data.content.content);
+
+    // Check if the JSON received is valid
+    const isValid =
+      Array.isArray(json_data) &&
+      json_data.every(
+        (item) =>
+          typeof item.id === 'string'
+      );
+
+    if (!isValid) {
+      // console.log('Failed check!');
+      return false;
+    }
+    // Add the transaction to the database
+    for (const transaction of json_data) {
+      // Add the transaction to the database
+      await deleteTransactionHelper(
+        userId,
+        transaction.id,
+      );
+    }
+
+    return response.data.content.content;
+  } catch (error) {
+    console.log(error);
+    return false;
+  }
+}
 // gptAddTransaction("66cacdbf5280abd4f2fab918",
 //       'I went to Hogwarts one last time for 1 coin (10 dollars) today'
 //     );
@@ -272,4 +328,5 @@ module.exports = {
   getSavingDetails,
   gptAddTransaction,
   gptUpdateTransaction,
+  gptDeleteTransaction,
 };

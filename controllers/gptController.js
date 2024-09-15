@@ -4,6 +4,7 @@ const {
   getSavingDetails,
   gptAddTransaction,
   gptUpdateTransaction,
+  gptDeleteTransaction,
 } = require('../helpers/gptHelper');
 const axios = require('axios');
 
@@ -237,6 +238,30 @@ exports.sendMainMessage = async (req, res) => {
             temperature: 0.5,
             system_prompt:
               'You are a reporter, I will give you an array of JSON of transactions. Before I asked you, there already has been a third parties who took care of the transactions updating. Your job is to inform me that it has been done."Reply in this format (sort entries by date ascending, do not tell the hour/minute, be sure to add new line after each entries): Done! I have updated <number> entries in your account.\n\n**Income**: \n\n<date> entries\n\n**Expenses**: \n\n<date> entries.\nExample:\nInput: [{"date": "2024-09-28T03:57", "type": "expense", "category": "Others", "transactionAmount": 35, "title": "Rented movie"}, {"time": "2024-09-30T03:57", "type": "income", "category": "Others", "transactionAmount": 120, "title": "Salary"}]\nOutput: Done! I have added 2 entries to your account.\n\n**Income**: 30th September 2024: Salary, 120$\n\n**Income**\n\n28th September 2024: Rented movie, 120$.\n\nNOTE: IF an empty array is received, reply "I cannot find any data related to your request :("',
+          },
+          messages: [{ role: 'user', content: json_data }],
+        };
+      } else if (lastMessage.content.startsWith('/delete')) {
+        let json_data = false;
+        let loopCount = 0;
+        for (let i = 0; i < 5; i++) {
+          json_data = await gptDeleteTransaction(userId, userMessage);
+          loopCount++;
+          if (json_data) {
+            break;
+          }
+        }
+        console.log(`Loop executed ${loopCount} times`);
+        if (json_data === false) {
+          return res.status(500).json({ error: '/delete command failed' });
+        }
+        // Assign payload
+        payload = {
+          settings: {
+            response_length: 'short',
+            temperature: 0.5,
+            system_prompt:
+              'You are a reporter, I will give you an array of JSON of transactions. Before I asked you, there already has been a third parties who took care of the transactions deleting. Your job is to inform me that it has been done."Reply in this format (sort entries by date ascending, do not tell the hour/minute, be sure to add new line after each entries): Done! I have deleted <number> entries in your account.\n\n**Income**: \n\n<date> entries\n\n**Expenses**: \n\n<date> entries.\n\nExample:\nInput: [{""date": "2024-09-28T03:57", "type": "expense", "category": "Others", "transactionAmount": 35, "title": "Rented movie""}, {"time": "2024-09-30T03:57", "type": "income", "category": "Others", "transactionAmount": 120, "title": "Salary"}]\nOutput: Done! I have deleted 2 entries to your account.\n\n**Income**: 30th September 2024: Salary, 120$\n\n**Income**\n\n28th September 2024: Rented movie, 120$.\n\nNOTE: IF an empty array is received, reply "I cannot find any data related to your request :("',
           },
           messages: [{ role: 'user', content: json_data }],
         };

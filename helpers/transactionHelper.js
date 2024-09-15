@@ -101,7 +101,7 @@ async function updateTransactionHelper(
   title
 ) {
   try {
-    console.log(userId)
+    console.log(userId);
     // Find the user by ID
     const user = await User.findById(userId);
     if (!user) {
@@ -157,4 +157,66 @@ async function updateTransactionHelper(
   }
 }
 
-module.exports = { createTransactionHelper, updateTransactionHelper };
+async function deleteTransactionHelper(userId, transactionId) {
+  try {
+    // Find the user by ID
+    const user = await User.findById(userId);
+    if (!user) {
+      throw new Error('User not found');
+    }
+
+    // Find the transaction by ID within the user's transactions array
+    const transaction = user.transactions.id(transactionId);
+    if (!transaction) {
+      throw new Error('Transaction not found');
+    }
+
+    // Prevent direct deletion of saving transactions
+    if (transaction.isSavingsTransfer) {
+      throw new Error('Saving transactions cannot be deleted directly');
+    }
+
+    // If this is an income transaction, check if there is a corresponding saving transaction
+    if (transaction.type === 'income') {
+      // Find the index of the associated saving transaction
+      const savingTransactionIndex = user.transactions.findIndex(
+        (t) =>
+          t.isSavingsTransfer && t.date.getTime() === transaction.date.getTime()
+      );
+
+      if (savingTransactionIndex !== -1) {
+        // Remove the corresponding saving transaction using splice
+        user.transactions.splice(savingTransactionIndex, 1);
+      }
+
+      // Adjust the current balance (subtract income)
+      user.currentBalance -= transaction.transactionAmount;
+    } else if (transaction.type === 'expense') {
+      // Adjust the current balance (add back expense)
+      user.currentBalance += transaction.transactionAmount;
+
+      // Adjust the budget if necessary
+      if (user.budget && user.budget.categories[transaction.category]) {
+        user.budget.categories[transaction.category].spent -=
+          transaction.transactionAmount;
+      }
+    }
+
+    // Remove the main transaction from the user's transactions array using pull
+    user.transactions.pull({ _id: transactionId });
+
+    // Save the updated user document
+    await user.save();
+
+    return transaction;
+  } catch (error) {
+    console.log(error);
+    throw new Error('An error occurred while deleting the transaction');
+  }
+}
+
+module.exports = {
+  createTransactionHelper,
+  updateTransactionHelper,
+  deleteTransactionHelper,
+};
