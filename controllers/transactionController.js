@@ -3,7 +3,11 @@ const {
   validateTransaction,
 } = require('../models/transactionModel');
 const { User } = require('../models/userModel');
-const { createTransactionHelper } = require('../helpers/transactionHelper');
+const {
+  createTransactionHelper,
+  updateTransactionHelper,
+  deleteTransactionHelper,
+} = require('../helpers/transactionHelper');
 
 // Create transaction(with Automatic Savings)
 exports.createTransaction = async (req, res) => {
@@ -11,7 +15,14 @@ exports.createTransaction = async (req, res) => {
     const userId = req.user._id;
     const { date, type, transactionAmount, category, title } = req.body;
 
-    newTransaction = createTransactionHelper(userId, date, type, transactionAmount, category, title);
+    newTransaction = createTransactionHelper(
+      userId,
+      date,
+      type,
+      transactionAmount,
+      category,
+      title
+    );
     // Respond with the newly created transaction
     res.status(201).json({
       status: 'success',
@@ -147,82 +158,31 @@ exports.getTransaction = async (req, res) => {
   }
 };
 
-// Update transaction
+// Update transaction (with Budget Integration)
 exports.updateTransaction = async (req, res) => {
   try {
     const userId = req.user._id;
     const transactionId = req.params.transactionId;
     const { date, type, category, transactionAmount, title } = req.body;
 
-    // Find the user by ID
-    const user = await User.findById(userId);
-    if (!user) {
-      return res.status(404).json({
-        status: 'fail',
-        message: 'User not found',
-      });
-    }
-
-    // Find the transaction by ID within the user's transactions array
-    const transaction = user.transactions.id(transactionId);
-    if (!transaction) {
-      return res.status(404).json({
-        status: 'fail',
-        message: 'Transaction not found',
-      });
-    }
-
-    // Reverse the effects of the existing transaction on balance and saving
-    if (transaction.isSavingsTransfer) {
-      if (transaction.type === 'income') {
-        user.currentBalance -= transaction.transactionAmount;
-        user.saving.currentAmount -= transaction.transactionAmount;
-      } else {
-        user.currentBalance += transaction.transactionAmount;
-        user.saving.currentAmount -= transaction.transactionAmount;
-      }
-    } else {
-      user.currentBalance +=
-        transaction.type === 'income'
-          ? -transaction.transactionAmount
-          : transaction.transactionAmount;
-    }
-
-    // Update the transaction fields
-    if (date) transaction.date = date;
-    if (type) transaction.type = type;
-    if (category) transaction.category = category;
-    if (transactionAmount) transaction.transactionAmount = transactionAmount;
-    if (title) transaction.title = title;
-
-    // Apply the new transaction effects to balance and saving
-    if (transaction.isSavingsTransfer) {
-      if (transaction.type === 'income') {
-        user.currentBalance += transaction.transactionAmount;
-        user.saving.currentAmount += transaction.transactionAmount;
-      } else {
-        user.currentBalance -= transaction.transactionAmount;
-        user.saving.currentAmount += transaction.transactionAmount;
-      }
-    } else {
-      user.currentBalance +=
-        transaction.type === 'income'
-          ? transaction.transactionAmount
-          : -transaction.transactionAmount;
-    }
-
-    // Save the updated user document
-    await user.save();
+    const updatedTransaction = await updateTransactionHelper(
+      userId,
+      transactionId,
+      date,
+      type,
+      category,
+      transactionAmount,
+      title
+    );
 
     // Send a success response with the updated transaction data
     res.status(200).json({
       status: 'success',
       data: {
-        transaction,
+        updatedTransaction,
       },
     });
   } catch (err) {
-    // Handle any errors during the process
     res.status(500).json({
       status: 'error',
       message: 'An error occurred while updating the transaction',
@@ -230,71 +190,174 @@ exports.updateTransaction = async (req, res) => {
   }
 };
 
-// Delete transaction
+// Delete transaction (with Budget Integration)
 exports.deleteTransaction = async (req, res) => {
   try {
-    // Extract user ID and transaction ID from the request parameters
-    const { transactionId } = req.params;
+    const userId = req.user._id;
+    const transactionId = req.params.transactionId;
 
-    // Find the user by ID
-    const user = await User.findById(req.user._id);
+    const deletedTransaction = await deleteTransactionHelper(
+      userId,
+      transactionId
+    );
+
+    // Send a success response
+    res.status(200).json({
+      status: 'success',
+      message: 'Transaction deleted successfully',
+      data: {
+        deletedTransaction,
+      },
+    });
+  } catch (err) {
+    res.status(500).json({
+      status: 'error',
+      message: 'An error occurred while deleting the transaction',
+      error: err.message,
+    });
+  }
+};
+
+// Get chart data for all transactions of a specific year
+exports.getChartData = async (req, res) => {
+  try {
+    const userId = req.user._id;
+    const { year } = req.query; // Get the year from the request query
+
+    if (!year) {
+      return res.status(400).json({
+        status: 'fail',
+        message: 'Please provide a year in the request query',
+      });
+    }
+
+    // Convert the year to a number to ensure it's valid
+    const targetYear = parseInt(year);
+    if (isNaN(targetYear)) {
+      return res.status(400).json({
+        status: 'fail',
+        message: 'Invalid year format',
+      });
+    }
+
+    // Find the user and get their transactions
+    const user = await User.findById(userId).select('transactions');
     if (!user) {
       return res
         .status(404)
         .json({ status: 'fail', message: 'User not found' });
     }
 
-    // Find the transaction in the user's transactions array
-    const transactionIndex = user.transactions.findIndex(
-      (transaction) => transaction._id.toString() === transactionId
-    );
+    const transactions = user.transactions;
 
-    if (transactionIndex === -1) {
-      return res
-        .status(404)
-        .json({ status: 'fail', message: 'Transaction not found' });
+    // Sort transactions by date
+    transactions.sort((a, b) => new Date(a.date) - new Date(b.date));
+
+    // Initialize a map to store data by month
+    const dataMap = new Map();
+    const monthNames = [
+      'January',
+      'February',
+      'March',
+      'April',
+      'May',
+      'June',
+      'July',
+      'August',
+      'September',
+      'October',
+      'November',
+      'December',
+    ];
+
+    // Loop through each transaction, filtering by the target year
+    transactions.forEach((transaction) => {
+      const date = new Date(transaction.date);
+      const transactionYear = date.getFullYear();
+      const month = date.getMonth(); // 0-11 for months in JavaScript
+
+      if (transactionYear === targetYear) {
+        const key = `${month}`;
+
+        if (!dataMap.has(key)) {
+          dataMap.set(key, { month: monthNames[month], income: 0, expense: 0 });
+        }
+
+        const dataEntry = dataMap.get(key);
+
+        if (transaction.type === 'income') {
+          dataEntry.income += transaction.transactionAmount;
+        } else if (transaction.type === 'expense') {
+          dataEntry.expense += transaction.transactionAmount;
+        }
+      }
+    });
+
+    // Initialize an array to hold the final data for all months
+    const filledData = [];
+
+    // Ensure that all 12 months are included, even if there are no transactions
+    for (let month = 0; month < 12; month++) {
+      const key = `${month}`;
+
+      if (dataMap.has(key)) {
+        filledData.push(dataMap.get(key));
+      } else {
+        filledData.push({ month: monthNames[month], income: 0, expense: 0 });
+      }
     }
 
-    // Get the transaction to be deleted
-    const transactionToDelete = user.transactions[transactionIndex];
-
-    // Adjust the current balance and saving amount based on the transaction type and whether it's a savings transfer
-    if (transactionToDelete.isSavingsTransfer) {
-      if (transactionToDelete.type === 'income') {
-        // Undo an income transfer from savings to current balance
-        user.currentBalance -= transactionToDelete.transactionAmount;
-        user.saving.currentAmount += transactionToDelete.transactionAmount;
-      } else if (transactionToDelete.type === 'expense') {
-        // Undo an expense transfer from current balance to savings
-        user.currentBalance += transactionToDelete.transactionAmount;
-        user.saving.currentAmount -= transactionToDelete.transactionAmount;
-      }
-    } else {
-      if (transactionToDelete.type === 'income') {
-        // Undo an income transaction (add back the amount to current balance)
-        user.currentBalance -= transactionToDelete.transactionAmount;
-      } else if (transactionToDelete.type === 'expense') {
-        // Undo an expense transaction (subtract the amount from current balance)
-        user.currentBalance += transactionToDelete.transactionAmount;
-      }
-    }
-
-    // Remove the transaction from the user's transactions array
-    user.transactions.splice(transactionIndex, 1);
-
-    // Save the updated user document
-    await user.save();
-
-    // Send a success response
+    // Respond with the data for the requested year
     res.status(200).json({
       status: 'success',
-      message: 'Transaction deleted successfully',
+      data: filledData,
     });
   } catch (err) {
-    // Handle any errors during the process
     res.status(500).json({
       status: 'error',
-      message: 'An error occurred while deleting the transaction',
+      message: 'An error occurred while fetching chart data',
+      error: err.message,
+    });
+  }
+};
+
+// Get all years that have transactions (income or expense) for the user
+exports.getTransactionYear = async (req, res) => {
+  try {
+    const userId = req.user._id;
+
+    // Find the user and get their transactions
+    const user = await User.findById(userId).select('transactions');
+    if (!user) {
+      return res
+        .status(404)
+        .json({ status: 'fail', message: 'User not found' });
+    }
+
+    const transactions = user.transactions;
+
+    // Initialize a set to store unique years
+    const yearsSet = new Set();
+
+    // Loop through each transaction and extract the year
+    transactions.forEach((transaction) => {
+      const transactionYear = new Date(transaction.date).getFullYear();
+      yearsSet.add(transactionYear);
+    });
+
+    // Convert the set to an array and sort the years in ascending order
+    const yearsArray = Array.from(yearsSet).sort((a, b) => a - b);
+
+    // Respond with the years array
+    res.status(200).json({
+      status: 'success',
+      data: yearsArray,
+    });
+  } catch (err) {
+    res.status(500).json({
+      status: 'error',
+      message: 'An error occurred while fetching transaction years',
+      error: err.message,
     });
   }
 };
