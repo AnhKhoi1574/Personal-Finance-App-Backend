@@ -73,17 +73,25 @@ async function getSortedTransactions(
     );
 
     const csvHeader = fetchId
-      ? 'id,date,type,category,title,transaction amount'
-      : 'date,type,category,title,transaction amount';
+      ? 'id,date(ddmmyy-hhmm),type,category,title,transaction amount'
+      : 'date(ddmmyy-hhmm),type,category,title,transaction amount';
+
+    const formatDate = (date) => {
+      const d = new Date(date);
+      const dd = String(d.getDate()).padStart(2, '0');
+      const mm = String(d.getMonth() + 1).padStart(2, '0'); // Months are zero-based
+      const yy = String(d.getFullYear()).slice(-2);
+      const hh = String(d.getHours()).padStart(2, '0');
+      const min = String(d.getMinutes()).padStart(2, '0');
+      return `${dd}${mm}${yy}-${hh}${min}`;
+    };
 
     const csvTransactions = sortedTransactions
       .map((transaction) => {
-        const formattedDate = fetchId
-          ? new Date(transaction.date).toISOString().slice(0, 16)
-          : transaction.date;
+        const formattedDate = formatDate(transaction.date);
         return fetchId
           ? `${transaction._id},${formattedDate},${transaction.type},${transaction.category},${transaction.title},${transaction.transactionAmount}`
-          : `${transaction.date},${transaction.type},${transaction.category},${transaction.title},${transaction.transactionAmount}`;
+          : `${formattedDate},${transaction.type},${transaction.category},${transaction.title},${transaction.transactionAmount}`;
       })
       .join('\n');
 
@@ -205,7 +213,12 @@ async function gptUpdateTransaction(userId, messages, startDate, endDate) {
       minute: '2-digit',
     });
 
-    let sortedTransactions = await getSortedTransactions(userId, startDate, endDate, true);
+    let sortedTransactions = await getSortedTransactions(
+      userId,
+      startDate,
+      endDate,
+      true
+    );
 
     const payload = {
       settings: {
@@ -214,8 +227,9 @@ async function gptUpdateTransaction(userId, messages, startDate, endDate) {
         system_prompt:
           'You are a JSON generator, I will give you a CSV of transactions, you will give me an array of JSON in plaintext, starts with the sqaure bracket only [. your job is to lookup for the ID in that CSV data, and identify what transaction I want to update the info of, then based on my request, change the data accordingly, then generate an array of JSON in plaintext (IMPORTANT: no extra messages, symbol) so I can use my API to update it, the format:\n- id (string): got by looking up the CSV data (only this it fetched from the CSV, all the below fields are up to you to decide, must be based on the users request)\n- date (string): in this format "2024-09-13T01:20" (year-month-date-hour-minute), if time is not specified, always assume. Note that currently its' +
           currentDateAndTime +
-          '\n- type (string): either "income" or "expense"\n- category (string): stay the same, unless specified otheriwse -> Change accordingly, note that if type is "income" then must be only "Income"; if type is "expense" then must be one of these: "Household", "Shopping", "Food", "Utilities", "Transportation", "Others" (category must capitalize the begin of char).\n- transactionAmount (float): stay the same, unless specified otherwise, the amount of the item, in float or integer e.g. 10 or 10.5\n- title (string): stay the SAME, unless explicitly specified otherwise the descriptive title of the transaction (do not make it too generic, but also do not hallucinate): e.g. Groceries (items...), Movie ticket for <film name>, A date, etc\n\nImportant Example:\nUser: /create I went to the club the other day for 30$\nYou: Done! I have added 1 entries to your account: Expenses: 13th September 2024: Club party, 30$\nUser: Sorry, I meant 35$\nYour exact output: [{"id": <id got from CSV>, "type": "expense", "category": "others", "transactionAmount": 35, "title": "Club party", "date": "2024-09-13T01:20"}]\n\nNOTE: IF NO TRANSACTION IS FOUND THEN return empty array [].\n\nMy CSV transactions: ' +
-          sortedTransactions + '\n\nREMEMBER your response format: [{}]',
+          '\n- type (string): either "income" or "expense"\n- category (string): stay the same, unless specified otheriwse -> Change accordingly, note that if type is "income" then must be only "Income"; if type is "expense" then must be one of these: "Household", "Shopping", "Food", "Utilities", "Transportation", "Others" (category must capitalize the begin of char).\n- transactionAmount (float): stay the same, unless specified otherwise, the amount of the item, in float or integer e.g. 10 or 10.5\n- title (string): stay the SAME, unless explicitly specified otherwise the descriptive title of the transaction (do not make it too generic, but also do not hallucinate): e.g. Groceries (items...), Movie ticket for <film name>, A date, etc\n\nImportant Example:\nUser: /create I went to the club the other day for 30$\nYou: Done! I have added 1 entries to your account: Expenses: 13th September 2024: Club party, 30$\nUser: Sorry, I meant 35$\nYour exact output: [{"id": <id got from CSV>, "type": "expense", "category": "others", "transactionAmount": 35, "title": "Club party", "date": "2024-09-13T01:20"}]\n\nNOTE: IF NO TRANSACTION IS FOUND THEN return empty array [].\n\nMy CSV transactions (date is formatted ddmmyy-hhmm): ' +
+          sortedTransactions +
+          '\n\nREMEMBER your response format: [{}]',
       },
       messages: messages,
     };
@@ -272,7 +286,12 @@ async function gptDeleteTransaction(userId, messages, startDate, endDate) {
       minute: '2-digit',
     });
 
-    let sortedTransactions = await getSortedTransactions(userId, startDate, endDate, true);
+    let sortedTransactions = await getSortedTransactions(
+      userId,
+      startDate,
+      endDate,
+      true
+    );
 
     const payload = {
       settings: {
@@ -281,8 +300,9 @@ async function gptDeleteTransaction(userId, messages, startDate, endDate) {
         system_prompt:
           'You are a JSON generator, I will give you a CSV of transactions, you will give me an array of JSON in plaintext, starts with the sqaure bracket only [. Your job is to lookup for the ID in that CSV data, and give me the ID of the transaction I want to delete the info from, then generate an array of JSON in plaintext (IMPORTANT: no extra messages, symbol) so I can use my API to delete it. Note that currently its ' +
           currentDateAndTime +
-          ' the format:\n- id (string): got by looking up the CSV data\n- transactionAmount (float): say how much it is\n- date (string): in this format dd-mm-yy (e.g. 10 September 2024)\n- title (string): say the title\n\nImportant Example:\nUser: /create I went to the club the other day for 30$\nYou: Done! I have added 1 entries to your account: Expenses: 13th September 2024: Club party, 30$\nUser: Sorry, I made a mistake, please delete it\nYour exact output: [{"id": <id got from CSV>, "date": "23 September 2024", "title": <title>, "transactionAmount": <amount>}]\n\nNOTE: IF NO TRANSACTION IS FOUND THEN return empty array [].\n\nMy CSV transactions: ' +
-          sortedTransactions + '\n\nREMEMBER your response format: [{}]',
+          ' the format:\n- id (string): got by looking up the CSV data\n- transactionAmount (float): say how much it is\n- date (string): in this format dd-mm-yy (e.g. 10 September 2024)\n- title (string): say the title\n\nImportant Example:\nUser: /create I went to the club the other day for 30$\nYou: Done! I have added 1 entries to your account: Expenses: 13th September 2024: Club party, 30$\nUser: Sorry, I made a mistake, please delete it\nYour exact output: [{"id": <id got from CSV>, "date": "23 September 2024", "title": <title>, "transactionAmount": <amount>}]\n\nNOTE: IF NO TRANSACTION IS FOUND THEN return empty array [].\n\nMy CSV transactions (date is formatted ddmmyy-hhmm): ' +
+          sortedTransactions +
+          '\n\nREMEMBER your response format: [{}]',
       },
       messages: messages,
     };
@@ -312,10 +332,6 @@ async function gptDeleteTransaction(userId, messages, startDate, endDate) {
     return false;
   }
 }
-// gptAddTransaction("66cacdbf5280abd4f2fab918",
-//       'I went to Hogwarts one last time for 1 coin (10 dollars) today'
-//     );
-// console.log(gptUpdateTransaction("66cacdbf5280abd4f2fab918",[{role:"user", content:"I was mentioned that the red light fine i got this week was supposed to be 40$"}]))
 
 module.exports = {
   getSortedTransactions,
