@@ -3,7 +3,11 @@ const {
   validateTransaction,
 } = require('../models/transactionModel');
 const { User } = require('../models/userModel');
-const { createTransactionHelper } = require('../helpers/transactionHelper');
+const {
+  createTransactionHelper,
+  updateTransactionHelper,
+  deleteTransactionHelper,
+} = require('../helpers/transactionHelper');
 
 // Create transaction(with Automatic Savings)
 exports.createTransaction = async (req, res) => {
@@ -11,7 +15,14 @@ exports.createTransaction = async (req, res) => {
     const userId = req.user._id;
     const { date, type, transactionAmount, category, title } = req.body;
 
-    newTransaction = createTransactionHelper(userId, date, type, transactionAmount, category, title);
+    newTransaction = createTransactionHelper(
+      userId,
+      date,
+      type,
+      transactionAmount,
+      category,
+      title
+    );
     // Respond with the newly created transaction
     res.status(201).json({
       status: 'success',
@@ -154,68 +165,21 @@ exports.updateTransaction = async (req, res) => {
     const transactionId = req.params.transactionId;
     const { date, type, category, transactionAmount, title } = req.body;
 
-    // Find the user by ID
-    const user = await User.findById(userId);
-    if (!user) {
-      return res.status(404).json({
-        status: 'fail',
-        message: 'User not found',
-      });
-    }
-
-    // Find the transaction by ID within the user's transactions array
-    const transaction = user.transactions.id(transactionId);
-    if (!transaction) {
-      return res.status(404).json({
-        status: 'fail',
-        message: 'Transaction not found',
-      });
-    }
-
-    // Prevent updating saving transactions
-    if (transaction.isSavingsTransfer) {
-      return res.status(403).json({
-        status: 'fail',
-        message: 'Saving transactions cannot be updated',
-      });
-    }
-
-    // Reverse the effects of the existing transaction on balance and saving amount
-    if (transaction.type === 'income') {
-      user.currentBalance -= transaction.transactionAmount;
-    } else if (transaction.type === 'expense') {
-      user.currentBalance += transaction.transactionAmount;
-      if (user.budget && user.budget.categories[transaction.category]) {
-        user.budget.categories[transaction.category].spent -=
-          transaction.transactionAmount;
-      }
-    }
-
-    // Update the transaction fields
-    if (date) transaction.date = date;
-    if (type) transaction.type = type;
-    if (category) transaction.category = category;
-    if (transactionAmount) transaction.transactionAmount = transactionAmount;
-    if (title) transaction.title = title;
-
-    // Apply the new transaction effects to balance and budget
-    if (type === 'income') {
-      user.currentBalance += transactionAmount;
-    } else if (type === 'expense') {
-      user.currentBalance -= transactionAmount;
-      if (user.budget && user.budget.categories[category]) {
-        user.budget.categories[category].spent += transactionAmount;
-      }
-    }
-
-    // Save the updated user document
-    await user.save();
+    const updatedTransaction = await updateTransactionHelper(
+      userId,
+      transactionId,
+      date,
+      type,
+      category,
+      transactionAmount,
+      title
+    );
 
     // Send a success response with the updated transaction data
     res.status(200).json({
       status: 'success',
       data: {
-        transaction,
+        updatedTransaction,
       },
     });
   } catch (err) {
@@ -229,71 +193,21 @@ exports.updateTransaction = async (req, res) => {
 // Delete transaction (with Budget Integration)
 exports.deleteTransaction = async (req, res) => {
   try {
-    // Extract user ID and transaction ID from the request parameters
-    const { transactionId } = req.params;
+    const userId = req.user._id;
+    const transactionId = req.params.transactionId;
 
-    // Find the user by ID
-    const user = await User.findById(req.user._id);
-    if (!user) {
-      return res.status(404).json({
-        status: 'fail',
-        message: 'User not found',
-      });
-    }
-
-    // Find the transaction in the user's transactions array
-    const transaction = user.transactions.id(transactionId);
-    if (!transaction) {
-      return res.status(404).json({
-        status: 'fail',
-        message: 'Transaction not found',
-      });
-    }
-
-    // Prevent direct deletion of saving transactions
-    if (transaction.isSavingsTransfer) {
-      return res.status(403).json({
-        status: 'fail',
-        message: 'Saving transactions cannot be deleted directly',
-      });
-    }
-
-    // If this is an income transaction, check if there is a corresponding saving transaction
-    if (transaction.type === 'income') {
-      // Find the index of the associated saving transaction
-      const savingTransactionIndex = user.transactions.findIndex(
-        (t) =>
-          t.isSavingsTransfer && t.date.getTime() === transaction.date.getTime()
-      );
-
-      if (savingTransactionIndex !== -1) {
-        // Remove the corresponding saving transaction using splice
-        user.transactions.splice(savingTransactionIndex, 1);
-      }
-
-      // Adjust the current balance (subtract income)
-      user.currentBalance -= transaction.transactionAmount;
-    } else if (transaction.type === 'expense') {
-      // Adjust the current balance (add back expense)
-      user.currentBalance += transaction.transactionAmount;
-
-      // Adjust the budget if necessary
-      if (user.budget && user.budget.categories[transaction.category]) {
-        user.budget.categories[transaction.category].spent -=
-          transaction.transactionAmount;
-      }
-    }
-
-    // Remove the main transaction from the user's transactions array using splice
-    user.transactions.pull({ _id: transactionId });
-
-    // Save the updated user document
-    await user.save();
+    const deletedTransaction = await deleteTransactionHelper(
+      userId,
+      transactionId
+    );
 
     // Send a success response
     res.status(200).json({
       status: 'success',
       message: 'Transaction deleted successfully',
+      data: {
+        deletedTransaction,
+      },
     });
   } catch (err) {
     res.status(500).json({

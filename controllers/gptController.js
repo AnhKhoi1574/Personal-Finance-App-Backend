@@ -3,22 +3,20 @@ const {
   getSortedTransactions,
   getSavingDetails,
   gptAddTransaction,
+  gptUpdateTransaction,
+  gptDeleteTransaction,
 } = require('../helpers/gptHelper');
 const axios = require('axios');
 
 exports.getAllConversations = async (req, res) => {
   try {
     const userId = req.user._id;
-    const page = parseInt(req.query.page) || 1;
-    const limit = parseInt(req.query.limit) || 7;
-    const skip = (page - 1) * limit;
 
     const conversations = await Conversation.find(
       { user: userId },
       '_id title createdAt'
     )
-      .skip(skip)
-      .limit(limit)
+      .sort({ createdAt: -1 }) // Ensure sorting order is maintained
       .exec();
 
     const transformedConversations = conversations.map((conversation) => ({
@@ -30,12 +28,9 @@ exports.getAllConversations = async (req, res) => {
     const totalConversations = await Conversation.countDocuments({
       user: userId,
     }).exec();
-    const totalPages = Math.ceil(totalConversations / limit);
 
     res.json({
       conversations: transformedConversations,
-      currentPage: page,
-      totalPages,
       totalConversations,
     });
   } catch (error) {
@@ -197,20 +192,99 @@ exports.sendMainMessage = async (req, res) => {
     // Check if user is attempting a command
     if (lastMessage.content.startsWith('/')) {
       if (lastMessage.content.startsWith('/create')) {
-        const json_data = await gptAddTransaction(userId, lastMessage.content);
+        let json_data = false;
+        let loopCount = 0;
+        for (let i = 0; i < 5; i++) {
+          json_data = await gptAddTransaction(userId, userMessage);
+          loopCount++;
+          if (json_data) {
+            break;
+          }
+        }
+        console.log(`Loop executed ${loopCount} times`);
+        if (json_data === false) {
+          return res.status(500).json({ error: '/create command failed' });
+        }
         // Assign payload
         payload = {
           settings: {
             response_length: 'short',
             temperature: 0.5,
             system_prompt:
-              'You are a reporter, I will give you an array of JSON of transactions. Before I asked you, there already has been a third parties who took care of the transactions adding. Your job is to inform me that it has been done. Reply in this format (sort entries by date ascending, do not tell the hour/minute): Done! I have added <number> entries to your account.\n\n**Income**: \n\n<date> entries\n\n**Expenses**: \n\n<date> entries.\nExample:\nInput: [{"date": "2024-09-28T03:57", "type": "expense", "category": "Others", "transactionAmount": 35, "title": "Rented movie"}, {"time": "2024-09-30T03:57", "type": "income", "category": "Others", "transactionAmount": 120, "title": "Salary"}]\nOutput: Done! I have added 2 entries to your account.\n\n**Income**: 30th September 2024: Salary, 120$\n\n**Income**\n\n28th September 2024: Rented movie, 120$',
+              'You are a reporter, I will give you an array of JSON of transactions. Before I asked you, there already has been a third parties who took care of the transactions adding. Your job is to inform me that it has been done. Reply in this format (sort entries by date ascending, do not tell the hour/minute): Done! I have added <number> entries to your account.\n\n**Income**: \n\n<date> entries\n\n**Expenses**: \n\n<date> entries.\nExample:\nInput: [{"date": "2024-09-28T03:57", "type": "expense", "category": "Others", "transactionAmount": 35, "title": "Rented movie"}, {"time": "2024-09-30T03:57", "type": "income", "category": "Others", "transactionAmount": 120, "title": "Salary"}]\nOutput: Done! I have added 2 entries to your account.\n\n**Income**: 30th September 2024: Salary, 120$\n\n**Income**\n\n28th September 2024: Rented movie, 120$\n\nNOTE: IF an empty array is received, reply "I do not understand what you are trying to add :(',
           },
           messages: [{ role: 'user', content: json_data }],
         };
-        if (json_data === null) {
-          return res.status(500).json({ error: '/create command failed' });
+      }
+      // Update command
+      else if (lastMessage.content.startsWith('/update')) {
+        let json_data = false;
+        let loopCount = 0;
+        for (let i = 0; i < 5; i++) {
+          json_data = await gptUpdateTransaction(userId, userMessage);
+          loopCount++;
+          if (json_data) {
+            break;
+          }
         }
+        console.log(`Loop executed ${loopCount} times`);
+        if (json_data === false) {
+          return res.status(500).json({ error: '/update command failed' });
+        }
+        // Assign payload
+        payload = {
+          settings: {
+            response_length: 'short',
+            temperature: 0.5,
+            system_prompt:
+              'You are a reporter, I will give you an array of JSON of transactions. Before I asked you, there already has been a third parties who took care of the transactions updating. Your job is to inform me that it has been done."Reply in this format (sort entries by date ascending, do not tell the hour/minute, be sure to add new line after each entries): Done! I have updated <number> entries in your account.\n\n**Income**: \n\n<date> entries\n\n**Expenses**: \n\n<date> entries.\nExample:\nInput: [{"date": "2024-09-28T03:57", "type": "expense", "category": "Others", "transactionAmount": 35, "title": "Rented movie"}, {"time": "2024-09-30T03:57", "type": "income", "category": "Others", "transactionAmount": 120, "title": "Salary"}]\nOutput: Done! I have added 2 entries to your account.\n\n**Income**: 30th September 2024: Salary, 120$\n\n**Income**\n\n28th September 2024: Rented movie, 120$.\n\nNOTE: IF an empty array is received, reply "I cannot find any data related to your request :("',
+          },
+          messages: [{ role: 'user', content: json_data }],
+        };
+      } else if (lastMessage.content.startsWith('/delete')) {
+        let json_data = false;
+        let loopCount = 0;
+        for (let i = 0; i < 5; i++) {
+          json_data = await gptDeleteTransaction(userId, userMessage);
+          loopCount++;
+          if (json_data) {
+            break;
+          }
+        }
+        console.log(`Loop executed ${loopCount} times`);
+        if (json_data === false) {
+          return res.status(500).json({ error: '/delete command failed' });
+        }
+        // Assign payload
+        payload = {
+          settings: {
+            response_length: 'short',
+            temperature: 0.5,
+            system_prompt:
+              'You are a reporter, I will give you an array of JSON of transactions. Before I asked you, there already has been a third parties who took care of the transactions deleting. Your job is to inform me that it has been done."Reply in this format (sort entries by date ascending, do not tell the hour/minute, be sure to add new line after each entries): Done! I have deleted <number> entries in your account.\n\n**Income**: \n\n<date> entries\n\n**Expenses**: \n\n<date> entries.\n\nExample:\nInput: [{""date": "2024-09-28T03:57", "type": "expense", "category": "Others", "transactionAmount": 35, "title": "Rented movie""}, {"time": "2024-09-30T03:57", "type": "income", "category": "Others", "transactionAmount": 120, "title": "Salary"}]\nOutput: Done! I have deleted 2 entries to your account.\n\n**Income**: 30th September 2024: Salary, 120$\n\n**Income**\n\n28th September 2024: Rented movie, 120$.\n\nNOTE: IF an empty array is received, reply "I cannot find any data related to your request :("',
+          },
+          messages: [{ role: 'user', content: json_data }],
+        };
+      } else {
+        // Stream hardcoded response
+        const hardcodedResponse = JSON.stringify({
+          content: {
+            content: 'Unknown command received, please try again',
+            title: 'Unknown command',
+          },
+        });
+
+        res.write(hardcodedResponse);
+        res.end();
+
+        const assistantMessage = {
+          role: 'assistant',
+          content: 'Unknown command received, please try again',
+        };
+
+        conversation.messages.push(assistantMessage);
+        await conversation.save();
+        return res.status(400).json({ error: 'Unknown command' });
       }
     } else {
       // Check if user requested a range of date
@@ -249,7 +323,8 @@ exports.sendMainMessage = async (req, res) => {
       let sortedTransactions = await getSortedTransactions(
         userId,
         startDate,
-        endDate
+        endDate,
+        false
       );
 
       // Get saving details
@@ -355,7 +430,7 @@ exports.sendMainMessage = async (req, res) => {
     });
   } catch (error) {
     console.error(error.message);
-    res.status(500).json({ error: 'Server error' });
+    res.status(500).json({ error: 'Internal Server error' });
   }
 };
 
