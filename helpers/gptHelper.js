@@ -165,8 +165,14 @@ async function gptAddTransaction(userId, messages) {
     };
 
     let response;
+    let json_data;
     response = await axios.post('http://127.0.0.1:8000/api/generate', payload);
-    let json_data = await JSON.parse(response.data.content.content);
+    try {
+      json_data = await JSON.parse(response.data.content.content);
+    } catch (error) {
+      console.log(error);
+      return false;
+    }
     // Sample JSON
     // Check if the JSON received is valid
     const isValid =
@@ -234,10 +240,15 @@ async function gptUpdateTransaction(userId, messages, startDate, endDate) {
       messages: messages,
     };
 
+    let json_data;
     let response;
     response = await axios.post('http://127.0.0.1:8000/api/generate', payload);
-    let json_data = await JSON.parse(response.data.content.content);
-
+    try {
+      json_data = await JSON.parse(response.data.content.content);
+    } catch (error) {
+      console.log(error);
+      return false;
+    }
     // Check if the JSON received is valid
     const isValid =
       Array.isArray(json_data) &&
@@ -307,9 +318,15 @@ async function gptDeleteTransaction(userId, messages, startDate, endDate) {
       messages: messages,
     };
 
+    let json_data;
     let response;
     response = await axios.post('http://127.0.0.1:8000/api/generate', payload);
-    let json_data = await JSON.parse(response.data.content.content);
+    try {
+      json_data = await JSON.parse(response.data.content.content);
+    } catch (error) {
+      console.log(error);
+      return false;
+    }
 
     // Check if the JSON received is valid
     const isValid =
