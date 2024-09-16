@@ -397,9 +397,17 @@ exports.sendMainMessage = async (req, res) => {
       }
     );
 
+    // Check if the response status code is different than 200
+    if (response.status !== 200) {
+      return res
+        .status(response.status)
+        .json({ error: 'Error from GPT Service.' });
+    }
+
     // Initialize variables to store the concatenated stream and title
     let concatenatedStream = '';
     let title = '';
+
     response.data.on('data', (chunk) => {
       const chunkString = chunk.toString();
       const chunkJson = JSON.parse(chunkString);
@@ -434,19 +442,33 @@ exports.sendMainMessage = async (req, res) => {
         conversation.title = title;
       }
 
-      // Save the conversation
-      await conversation.save();
+      // Save the conversation with error handling
+      try {
+        await conversation.save();
+      } catch (mongooseError) {
+        console.error('Error saving conversation:', "Could be because GPT server failed? Cookies maybe?");
+        // Ensure the response is not sent again if headers are already sent
+        if (!res.headersSent) {
+          res
+            .status(500)
+            .json({ error: 'Error saving conversation to the database.' });
+        }
+      }
     });
 
     response.data.on('error', (error) => {
       console.error('Error in streaming response:', error.message);
-      res
-        .status(500)
-        .json({ error: 'Error in streaming response from GPT Service.' });
+      if (!res.headersSent) {
+        res
+          .status(500)
+          .json({ error: 'Error in streaming response from GPT Service.' });
+      }
     });
   } catch (error) {
     console.error(error.message);
-    res.status(500).json({ error: 'Internal Server error' });
+    if (!res.headersSent) {
+      res.status(500).json({ error: 'Internal Server error' });
+    }
   }
 };
 
