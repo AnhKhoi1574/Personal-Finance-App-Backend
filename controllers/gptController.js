@@ -129,6 +129,38 @@ exports.sendMainMessage = async (req, res) => {
     const userId = req.user._id;
     if (!userId) return res.status(404).json({ error: 'User not found' });
 
+    // Check if user requested a range of date
+    let startDate, endDate;
+    try {
+      if (req.body.transaction_start_date) {
+        const transactionStartDate = req.body.transaction_start_date;
+        if (!transactionStartDate || !/^\d{6}$/.test(transactionStartDate)) {
+          throw new Error('Invalid transaction start date format');
+        }
+        startDate = transactionStartDate;
+      }
+      if (req.body.transaction_end_date) {
+        const transactionEndDate = req.body.transaction_end_date;
+        if (!transactionEndDate || !/^\d{6}$/.test(transactionEndDate)) {
+          throw new Error('Invalid transaction end date format');
+        }
+        endDate = transactionEndDate;
+      }
+    } catch (error) {
+      console.error('Invalid date format:', error.message);
+      return res
+        .status(400)
+        .json({ error: 'Invalid start_date or end_date format received' });
+    }
+
+    // Prepare the data for the payload
+    // Get current date
+    let currentDate = new Date().toLocaleDateString('en-GB', {
+      day: 'numeric',
+      month: 'long',
+      year: 'numeric',
+    });
+
     let userMessage = req.body.messages;
     // Check if received message is valid
     const isValidMessage = (messages) => {
@@ -202,26 +234,27 @@ exports.sendMainMessage = async (req, res) => {
           }
         }
         console.log(`Loop executed ${loopCount} times`);
-        if (json_data === false) {
+        // Assign payload
+        if (json_data) {
+          payload = {
+            settings: {
+              response_length: 'short',
+              temperature: 0.5,
+              system_prompt:
+                'You are a reporter, I will give you an array of JSON of transactions. Before I asked you, there already has been a third parties who took care of the transactions adding. Your job is to inform me that it has been done. Reply in this format (sort entries by date ascending, do not tell the hour/minute): Done! I have added <number> entries to your account.\n\n**Income**: \n\n<date> entries\n\n**Expenses**: \n\n<date> entries.\nExample:\nInput: [{"date": "2024-09-28T03:57", "type": "expense", "category": "Others", "transactionAmount": 35, "title": "Rented movie"}, {"time": "2024-09-30T03:57", "type": "income", "category": "Others", "transactionAmount": 120, "title": "Salary"}]\nOutput: Done! I have added 2 entries to your account.\n\n**Income**: 30th September 2024: Salary, 120$\n\n**Income**\n\n28th September 2024: Rented movie, 120$\n\nNOTE: IF an empty array is received, reply "I do not understand what you are trying to add :(',
+            },
+            messages: [{ role: 'user', content: 'Array JSON: ' + json_data }],
+          };
+        } else {
           return res.status(500).json({ error: '/create command failed' });
         }
-        // Assign payload
-        payload = {
-          settings: {
-            response_length: 'short',
-            temperature: 0.5,
-            system_prompt:
-              'You are a reporter, I will give you an array of JSON of transactions. Before I asked you, there already has been a third parties who took care of the transactions adding. Your job is to inform me that it has been done. Reply in this format (sort entries by date ascending, do not tell the hour/minute): Done! I have added <number> entries to your account.\n\n**Income**: \n\n<date> entries\n\n**Expenses**: \n\n<date> entries.\nExample:\nInput: [{"date": "2024-09-28T03:57", "type": "expense", "category": "Others", "transactionAmount": 35, "title": "Rented movie"}, {"time": "2024-09-30T03:57", "type": "income", "category": "Others", "transactionAmount": 120, "title": "Salary"}]\nOutput: Done! I have added 2 entries to your account.\n\n**Income**: 30th September 2024: Salary, 120$\n\n**Income**\n\n28th September 2024: Rented movie, 120$\n\nNOTE: IF an empty array is received, reply "I do not understand what you are trying to add :(',
-          },
-          messages: [{ role: 'user', content: json_data }],
-        };
       }
       // Update command
       else if (lastMessage.content.startsWith('/update')) {
         let json_data = false;
         let loopCount = 0;
         for (let i = 0; i < 5; i++) {
-          json_data = await gptUpdateTransaction(userId, userMessage);
+          json_data = await gptUpdateTransaction(userId, userMessage, startDate, endDate);
           loopCount++;
           if (json_data) {
             break;
@@ -232,40 +265,46 @@ exports.sendMainMessage = async (req, res) => {
           return res.status(500).json({ error: '/update command failed' });
         }
         // Assign payload
-        payload = {
-          settings: {
-            response_length: 'short',
-            temperature: 0.5,
-            system_prompt:
-              'You are a reporter, I will give you an array of JSON of transactions. Before I asked you, there already has been a third parties who took care of the transactions updating. Your job is to inform me that it has been done."Reply in this format (sort entries by date ascending, do not tell the hour/minute, be sure to add new line after each entries): Done! I have updated <number> entries in your account.\n\n**Income**: \n\n<date> entries\n\n**Expenses**: \n\n<date> entries.\nExample:\nInput: [{"date": "2024-09-28T03:57", "type": "expense", "category": "Others", "transactionAmount": 35, "title": "Rented movie"}, {"time": "2024-09-30T03:57", "type": "income", "category": "Others", "transactionAmount": 120, "title": "Salary"}]\nOutput: Done! I have added 2 entries to your account.\n\n**Income**: 30th September 2024: Salary, 120$\n\n**Income**\n\n28th September 2024: Rented movie, 120$.\n\nNOTE: IF an empty array is received, reply "I cannot find any data related to your request :("',
-          },
-          messages: [{ role: 'user', content: json_data }],
-        };
+        if (json_data) {
+          payload = {
+            settings: {
+              response_length: 'short',
+              temperature: 0.5,
+              system_prompt:
+                'You are a reporter, I will give you an array of JSON of transactions. Before I asked you, there already has been a third parties who took care of the transactions updating. Your job is to inform me that it has been done."Reply in this format (sort entries by date ascending, do not tell the hour/minute, be sure to add new line after each entries): Done! I have updated <number> entries in your account.\n\n**Income**: \n\n<date> entries\n\n**Expenses**: \n\n<date> entries.\nExample:\nInput: [{"date": "2024-09-28T03:57", "type": "expense", "category": "Others", "transactionAmount": 35, "title": "Rented movie"}, {"time": "2024-09-30T03:57", "type": "income", "category": "Others", "transactionAmount": 120, "title": "Salary"}]\nOutput: Done! I have updated 2 entries to your account.\n\n**Income**: 30th September 2024: Salary, 120$\n\n**Income**\n\n28th September 2024: Rented movie, 120$.\n\nNOTE: IF an empty array is received, reply "I cannot find any data related to your request :("',
+            },
+            messages: [{ role: 'user', content: 'Array JSON: ' + json_data }],
+          };
+        } else {
+          return res.status(500).json({ error: '/update command failed' });
+        }
       } else if (lastMessage.content.startsWith('/delete')) {
         let json_data = false;
         let loopCount = 0;
         for (let i = 0; i < 5; i++) {
-          json_data = await gptDeleteTransaction(userId, userMessage);
+          json_data = await gptDeleteTransaction(userId, userMessage, startDate, endDate);
           loopCount++;
           if (json_data) {
             break;
           }
         }
         console.log(`Loop executed ${loopCount} times`);
-        if (json_data === false) {
+        // Assign payload
+        if (json_data) {
+          payload = {
+            settings: {
+              response_length: 'short',
+              temperature: 0.5,
+              system_prompt:
+                'You are a reporter, I will give you an array of JSON of transactions. Before I asked you, there already has been a third parties who took care of the transactions deleting. Your job is to inform me that it has been done."Reply in this format (sort entries by date ascending, do not tell the hour/minute, be sure to add new line after each entries): Done! I have deleted <number> entries in your account.\n\n**Income**: \n\n<date> entries\n\n**Expenses**: \n\n<date> entries.\n\nExample:\nInput: [{""date": "2024-09-28T03:57", "type": "expense", "category": "Others", "transactionAmount": 35, "title": "Rented movie""}, {"time": "2024-09-30T03:57", "type": "income", "category": "Others", "transactionAmount": 120, "title": "Salary"}]\nOutput: Done! I have deleted 2 entries to your account.\n\n**Income**: 30th September 2024: Salary, 120$\n\n**Income**\n\n28th September 2024: Rented movie, 120$.\n\nNOTE: IF an empty array is received, reply "I cannot find any data related to your request :("',
+            },
+            messages: [{ role: 'user', content: 'Array JSON: ' + json_data }],
+          };
+        } else {
           return res.status(500).json({ error: '/delete command failed' });
         }
-        // Assign payload
-        payload = {
-          settings: {
-            response_length: 'short',
-            temperature: 0.5,
-            system_prompt:
-              'You are a reporter, I will give you an array of JSON of transactions. Before I asked you, there already has been a third parties who took care of the transactions deleting. Your job is to inform me that it has been done."Reply in this format (sort entries by date ascending, do not tell the hour/minute, be sure to add new line after each entries): Done! I have deleted <number> entries in your account.\n\n**Income**: \n\n<date> entries\n\n**Expenses**: \n\n<date> entries.\n\nExample:\nInput: [{""date": "2024-09-28T03:57", "type": "expense", "category": "Others", "transactionAmount": 35, "title": "Rented movie""}, {"time": "2024-09-30T03:57", "type": "income", "category": "Others", "transactionAmount": 120, "title": "Salary"}]\nOutput: Done! I have deleted 2 entries to your account.\n\n**Income**: 30th September 2024: Salary, 120$\n\n**Income**\n\n28th September 2024: Rented movie, 120$.\n\nNOTE: IF an empty array is received, reply "I cannot find any data related to your request :("',
-          },
-          messages: [{ role: 'user', content: json_data }],
-        };
       } else {
+        // Unknown commands
         // Stream hardcoded response
         const hardcodedResponse = JSON.stringify({
           content: {
@@ -283,42 +322,9 @@ exports.sendMainMessage = async (req, res) => {
         };
 
         conversation.messages.push(assistantMessage);
-        await conversation.save();
         return res.status(400).json({ error: 'Unknown command' });
       }
     } else {
-      // Check if user requested a range of date
-      let startDate, endDate;
-      try {
-        if (req.body.transaction_start_date) {
-          const transactionStartDate = req.body.transaction_start_date;
-          if (!transactionStartDate || !/^\d{6}$/.test(transactionStartDate)) {
-            throw new Error('Invalid transaction start date format');
-          }
-          startDate = transactionStartDate;
-        }
-        if (req.body.transaction_end_date) {
-          const transactionEndDate = req.body.transaction_end_date;
-          if (!transactionEndDate || !/^\d{6}$/.test(transactionEndDate)) {
-            throw new Error('Invalid transaction end date format');
-          }
-          endDate = transactionEndDate;
-        }
-      } catch (error) {
-        console.error('Invalid date format:', error.message);
-        return res
-          .status(400)
-          .json({ error: 'Invalid start_date or end_date format received' });
-      }
-
-      // Prepare the data for the payload
-      // Get current date
-      let currentDate = new Date().toLocaleDateString('en-GB', {
-        day: 'numeric',
-        month: 'long',
-        year: 'numeric',
-      });
-
       // Get current transactions
       let sortedTransactions = await getSortedTransactions(
         userId,
@@ -361,7 +367,7 @@ exports.sendMainMessage = async (req, res) => {
           response_length: response_length,
           temperature: temperature,
           system_prompt:
-            "Act as a Financial Assistant, you will give me answers to any questions or requests. There are important notes you should be aware of before answering:\n- The question or requests should only be related to money, investing, mortgage, etc... anything finance-related. If the question/request considerably goes out of these scopes, refuse to reply.\n- Your answer should be in correlation of these things: the current date, the transactions data (in CSV format), and the saving goal's name/amount. You should be aware of them to give a personalized answer, while also quoting your statements to the data given (e.g. Transactions details, etc). Be sure to always check the given data as they will be updated occasionally, keeping the balance between the relevancy of the data and the previous responses.\n" +
+            "Act as a Financial Assistant, you will give me answers to any questions or requests. There are important notes you should be aware of before answering:\n- The question or requests should only be related to money, investing, mortgage, etc... anything finance-related. Use dollar signs $. If the question/request considerably goes out of these scopes, refuse to reply.\n- Your answer should be in correlation of these things: the current date, the transactions data (in CSV format), and the saving goal's name/amount. You should be aware of them to give a personalized answer, while also quoting your statements to the data given (e.g. Transactions details, etc). Be sure to always check the given data as they will be updated occasionally, keeping the balance between the relevancy of the data and the previous responses.\n" +
             'The current date is: ' +
             currentDate +
             '\n' +

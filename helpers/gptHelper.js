@@ -146,10 +146,10 @@ async function gptAddTransaction(userId, messages) {
     });
     const payload = {
       settings: {
-        response_length: 'medium',
+        response_length: 'long',
         temperature: 0.4,
         system_prompt:
-          'You are a JSON generator, I will give you details about my transactions, your job is to identify exactly what the user is trying to add, and fill in the missing data appropriately (e.g. deciding which category, or which transaction title is descriptive, calculate the amount yourself if I do not tell you explicitly), then provide an array of JSONs containing:\n- date(string): in this example format "2024-09-13T01:20" (year-month-date-hour-minute), if time is not specified, always assume. Note that currently its' +
+          'You are a JSON generator, I will give you details about my transactions, you will give me an array of JSON in plaintext, starts with the sqaure bracket only [. Your job is to identify exactly what the user is trying to add, and fill in the missing data appropriately (e.g. deciding which category, or which transaction title is descriptive, calculate the amount yourself if I do not tell you explicitly), then provide an array of JSONs containing:\n- date(string): in this example format "2024-09-13T01:20" (year-month-date-hour-minute), if time is not specified, always assume. Note that currently its' +
           currentDateAndTime +
           'at 3:04AM\n- type(string): either "income" or "expense"\n- category(string): if type is "income" then must be only "Income"; if type is "expense" then must be one of these: "Household", "Shopping", "Food", "Utilities", "Transportation", "Others" (category must capitalize the begin of char).\n- transactionAmount(float): the amount of the item, in float or integer e.g. 10 or 10.5\n- title(string): the descriptive title of the transaction (do not make it too generic, but also do not hallucinate): e.g. Groceries (items...), Movie ticket for <film name>, A date, etc\n\nExample:\n-Input: I went to the groceries store yesterday to grab some chickens after gym, it costed me 20$ for 10 thighs of chickens. And I got fined 100$ by a police for running a red light. Luckily, my boss gave me rewards for being so nice to him, he gave me 150$.\n-Your Output (Exactly as followed without any format, plaintext):\n[{"date": <you decide>, "type": "expense","category": "Food","transactionAmount": 20,"title": <You decide>}, {<2nd item>}, {<3rd item>}]. NOTE: If you do not understand, return empty array [].',
       },
@@ -195,7 +195,7 @@ async function gptAddTransaction(userId, messages) {
   }
 }
 
-async function gptUpdateTransaction(userId, messages) {
+async function gptUpdateTransaction(userId, messages, startDate, endDate) {
   try {
     let currentDateAndTime = new Date().toLocaleDateString('en-GB', {
       day: 'numeric',
@@ -205,17 +205,17 @@ async function gptUpdateTransaction(userId, messages) {
       minute: '2-digit',
     });
 
-    let sortedTransactions = await getSortedTransactions(userId, '', '', true);
+    let sortedTransactions = await getSortedTransactions(userId, startDate, endDate, true);
 
     const payload = {
       settings: {
-        response_length: 'medium',
+        response_length: 'long',
         temperature: 0.4,
         system_prompt:
-          'You are a JSON generator, I will give you a CSV of transactions, your job is to lookup for the ID in that CSV data, and identify what transaction I want to update the info of, then based on my request, change the data accordingly, then generate an array of JSON in plaintext (IMPORTANT: no extra messages, symbol) so I can use my API to update it, the format:\n- id (string): got by looking up the CSV data (only this it fetched from the CSV, all the below fields are up to you to decide, must be based on the users request)\n- date (string): in this format "2024-09-13T01:20" (year-month-date-hour-minute), if time is not specified, always assume. Note that currently its' +
+          'You are a JSON generator, I will give you a CSV of transactions, you will give me an array of JSON in plaintext, starts with the sqaure bracket only [. your job is to lookup for the ID in that CSV data, and identify what transaction I want to update the info of, then based on my request, change the data accordingly, then generate an array of JSON in plaintext (IMPORTANT: no extra messages, symbol) so I can use my API to update it, the format:\n- id (string): got by looking up the CSV data (only this it fetched from the CSV, all the below fields are up to you to decide, must be based on the users request)\n- date (string): in this format "2024-09-13T01:20" (year-month-date-hour-minute), if time is not specified, always assume. Note that currently its' +
           currentDateAndTime +
-          '\n- type (string): either "income" or "expense"\n- category (string): stay the same, unless specified otheriwse -> Change accordingly, note that if type is "income" then must be only "Income"; if type is "expense" then must be one of these: "Household", "Shopping", "Food", "Utilities", "Transportation", "Others" (category must capitalize the begin of char).\n- transactionAmount (float): stay the same, unless specified otherwise, the amount of the item, in float or integer e.g. 10 or 10.5\n- title (string): stay the SAME, unless explicitly specified otherwise the descriptive title of the transaction (do not make it too generic, but also do not hallucinate): e.g. Groceries (items...), Movie ticket for <film name>, A date, etc\n\nImportant Example:\nUser: /create I went to the club the other day for 30$\nYou: Done! I have added 1 entries to your account: Expenses: 13th September 2024: Club party, 30$\nUser: Sorry, I meant 35$\nYour exact output: [{"id": <id got from CSV>, "type": "expense", "category": "others", "transactionAmount": 35, "title": "Club party"}]\n\nNOTE: IF NO TRANSACTION IS FOUND THEN return empty array [].\n\nMy CSV transactions: ' +
-          sortedTransactions,
+          '\n- type (string): either "income" or "expense"\n- category (string): stay the same, unless specified otheriwse -> Change accordingly, note that if type is "income" then must be only "Income"; if type is "expense" then must be one of these: "Household", "Shopping", "Food", "Utilities", "Transportation", "Others" (category must capitalize the begin of char).\n- transactionAmount (float): stay the same, unless specified otherwise, the amount of the item, in float or integer e.g. 10 or 10.5\n- title (string): stay the SAME, unless explicitly specified otherwise the descriptive title of the transaction (do not make it too generic, but also do not hallucinate): e.g. Groceries (items...), Movie ticket for <film name>, A date, etc\n\nImportant Example:\nUser: /create I went to the club the other day for 30$\nYou: Done! I have added 1 entries to your account: Expenses: 13th September 2024: Club party, 30$\nUser: Sorry, I meant 35$\nYour exact output: [{"id": <id got from CSV>, "type": "expense", "category": "others", "transactionAmount": 35, "title": "Club party", "date": "2024-09-13T01:20"}]\n\nNOTE: IF NO TRANSACTION IS FOUND THEN return empty array [].\n\nMy CSV transactions: ' +
+          sortedTransactions + '\n\nREMEMBER your response format: [{}]',
       },
       messages: messages,
     };
@@ -262,7 +262,7 @@ async function gptUpdateTransaction(userId, messages) {
   }
 }
 
-async function gptDeleteTransaction(userId, messages) {
+async function gptDeleteTransaction(userId, messages, startDate, endDate) {
   try {
     let currentDateAndTime = new Date().toLocaleDateString('en-GB', {
       day: 'numeric',
@@ -272,17 +272,17 @@ async function gptDeleteTransaction(userId, messages) {
       minute: '2-digit',
     });
 
-    let sortedTransactions = await getSortedTransactions(userId, '', '', true);
+    let sortedTransactions = await getSortedTransactions(userId, startDate, endDate, true);
 
     const payload = {
       settings: {
-        response_length: 'medium',
+        response_length: 'long',
         temperature: 0.4,
         system_prompt:
-          'You are a JSON generator, I will give you a CSV of transactions, your job is to lookup for the ID in that CSV data, and give me the ID of the transaction I want to delete the info from, then generate an array of JSON in plaintext (IMPORTANT: no extra messages, symbol) so I can use my API to delete it. Note that currently its ' +
+          'You are a JSON generator, I will give you a CSV of transactions, you will give me an array of JSON in plaintext, starts with the sqaure bracket only [. Your job is to lookup for the ID in that CSV data, and give me the ID of the transaction I want to delete the info from, then generate an array of JSON in plaintext (IMPORTANT: no extra messages, symbol) so I can use my API to delete it. Note that currently its ' +
           currentDateAndTime +
           ' the format:\n- id (string): got by looking up the CSV data\n- transactionAmount (float): say how much it is\n- date (string): in this format dd-mm-yy (e.g. 10 September 2024)\n- title (string): say the title\n\nImportant Example:\nUser: /create I went to the club the other day for 30$\nYou: Done! I have added 1 entries to your account: Expenses: 13th September 2024: Club party, 30$\nUser: Sorry, I made a mistake, please delete it\nYour exact output: [{"id": <id got from CSV>, "date": "23 September 2024", "title": <title>, "transactionAmount": <amount>}]\n\nNOTE: IF NO TRANSACTION IS FOUND THEN return empty array [].\n\nMy CSV transactions: ' +
-          sortedTransactions,
+          sortedTransactions + '\n\nREMEMBER your response format: [{}]',
       },
       messages: messages,
     };
@@ -294,10 +294,7 @@ async function gptDeleteTransaction(userId, messages) {
     // Check if the JSON received is valid
     const isValid =
       Array.isArray(json_data) &&
-      json_data.every(
-        (item) =>
-          typeof item.id === 'string'
-      );
+      json_data.every((item) => typeof item.id === 'string');
 
     if (!isValid) {
       // console.log('Failed check!');
@@ -306,10 +303,7 @@ async function gptDeleteTransaction(userId, messages) {
     // Add the transaction to the database
     for (const transaction of json_data) {
       // Add the transaction to the database
-      await deleteTransactionHelper(
-        userId,
-        transaction.id,
-      );
+      await deleteTransactionHelper(userId, transaction.id);
     }
 
     return response.data.content.content;
