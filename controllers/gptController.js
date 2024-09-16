@@ -223,106 +223,116 @@ exports.sendMainMessage = async (req, res) => {
 
     // Check if user is attempting a command
     if (lastMessage.content.startsWith('/')) {
-      if (lastMessage.content.startsWith('/create')) {
-        let json_data = false;
-        let loopCount = 0;
-        for (let i = 0; i < 5; i++) {
-          json_data = await gptAddTransaction(userId, userMessage);
-          loopCount++;
-          if (json_data) {
-            break;
+      let json_data = false;
+      let loopCount = 0;
+      const command = lastMessage.content.split(' ')[0];
+      switch (command) {
+        case '/create':
+          for (let i = 0; i < 5; i++) {
+            json_data = await gptAddTransaction(userId, userMessage);
+            loopCount++;
+            if (json_data) {
+              break;
+            }
           }
-        }
-        console.log(`Loop executed ${loopCount} times`);
-        // Assign payload
-        if (json_data) {
-          payload = {
-            settings: {
-              response_length: 'short',
-              temperature: 0.5,
-              system_prompt:
-                'You are a reporter, I will give you an array of JSON of transactions. Before I asked you, there already has been a third parties who took care of the transactions adding. Your job is to inform me that it has been done. Reply in this format (sort entries by date ascending, do not tell the hour/minute): Done! I have added <number> entries to your account.\n\n**Income**: \n\n<date> entries\n\n**Expenses**: \n\n<date> entries.\nExample:\nInput: [{"date": "2024-09-28T03:57", "type": "expense", "category": "Others", "transactionAmount": 35, "title": "Rented movie"}, {"time": "2024-09-30T03:57", "type": "income", "category": "Others", "transactionAmount": 120, "title": "Salary"}]\nOutput: Done! I have added 2 entries to your account.\n\n**Income**: 30th September 2024: Salary, 120$\n\n**Income**\n\n28th September 2024: Rented movie, 120$\n\nNOTE: IF an empty array is received, reply "I do not understand what you are trying to add :(',
-            },
-            messages: [{ role: 'user', content: 'Array JSON: ' + json_data }],
-          };
-        } else {
-          return res.status(500).json({ error: '/create command failed' });
-        }
-      }
-      // Update command
-      else if (lastMessage.content.startsWith('/update')) {
-        let json_data = false;
-        let loopCount = 0;
-        for (let i = 0; i < 5; i++) {
-          json_data = await gptUpdateTransaction(userId, userMessage, startDate, endDate);
-          loopCount++;
+          console.log(`Loop executed ${loopCount} times`);
+          // Assign payload
           if (json_data) {
-            break;
+            payload = {
+              settings: {
+                response_length: 'short',
+                temperature: 0.5,
+                system_prompt:
+                  'You are a reporter, I will give you an array of JSON of transactions. Before I asked you, there already has been a third parties who took care of the transactions adding. Your job is to inform me that it has been done. Reply in this format (sort entries by date ascending, do not tell the hour/minute): Done! I have added <number> entries to your account.\n\n**Income**: \n\n<date> entries\n\n**Expenses**: \n\n<date> entries.\nExample:\nInput: [{"date": "2024-09-28T03:57", "type": "expense", "category": "Others", "transactionAmount": 35, "title": "Rented movie"}, {"time": "2024-09-30T03:57", "type": "income", "category": "Others", "transactionAmount": 120, "title": "Salary"}]\nOutput: Done! I have added 2 entries to your account.\n\n**Income**: 30th September 2024: Salary, 120$\n\n**Income**\n\n28th September 2024: Rented movie, 120$\n\nNOTE: IF an empty array is received, reply "I do not understand what you are trying to add :(',
+              },
+              messages: [{ role: 'user', content: 'Array JSON: ' + json_data }],
+            };
+          } else {
+            return res.status(500).json({ error: '/create command failed' });
           }
-        }
-        console.log(`Loop executed ${loopCount} times`);
-        if (json_data === false) {
-          return res.status(500).json({ error: '/update command failed' });
-        }
-        // Assign payload
-        if (json_data) {
-          payload = {
-            settings: {
-              response_length: 'short',
-              temperature: 0.5,
-              system_prompt:
-                'You are a reporter, I will give you an array of JSON of transactions. Before I asked you, there already has been a third parties who took care of the transactions updating. Your job is to inform me that it has been done."Reply in this format (sort entries by date ascending, do not tell the hour/minute, be sure to add new line after each entries): Done! I have updated <number> entries in your account.\n\n**Income**: \n\n<date> entries\n\n**Expenses**: \n\n<date> entries.\nExample:\nInput: [{"date": "2024-09-28T03:57", "type": "expense", "category": "Others", "transactionAmount": 35, "title": "Rented movie"}, {"time": "2024-09-30T03:57", "type": "income", "category": "Others", "transactionAmount": 120, "title": "Salary"}]\nOutput: Done! I have updated 2 entries to your account.\n\n**Income**: 30th September 2024: Salary, 120$\n\n**Income**\n\n28th September 2024: Rented movie, 120$.\n\nNOTE: IF an empty array is received, reply "I cannot find any data related to your request :("',
-            },
-            messages: [{ role: 'user', content: 'Array JSON: ' + json_data }],
-          };
-        } else {
-          return res.status(500).json({ error: '/update command failed' });
-        }
-      } else if (lastMessage.content.startsWith('/delete')) {
-        let json_data = false;
-        let loopCount = 0;
-        for (let i = 0; i < 5; i++) {
-          json_data = await gptDeleteTransaction(userId, userMessage, startDate, endDate);
-          loopCount++;
+          break;
+        case '/update':
+          for (let i = 0; i < 5; i++) {
+            json_data = await gptUpdateTransaction(
+              userId,
+              userMessage,
+              startDate,
+              endDate
+            );
+            loopCount++;
+            if (json_data) {
+              break;
+            }
+          }
+          console.log(`Loop executed ${loopCount} times`);
+          if (json_data === false) {
+            return res.status(500).json({ error: '/update command failed' });
+          }
+          // Assign payload
           if (json_data) {
-            break;
+            payload = {
+              settings: {
+                response_length: 'short',
+                temperature: 0.5,
+                system_prompt:
+                  'You are a reporter, I will give you an array of JSON of transactions. Before I asked you, there already has been a third parties who took care of the transactions updating. Your job is to inform me that it has been done."Reply in this format (sort entries by date ascending, do not tell the hour/minute, be sure to add new line after each entries): Done! I have updated <number> entries in your account.\n\n**Income**: \n\n<date> entries\n\n**Expenses**: \n\n<date> entries.\nExample:\nInput: [{"date": "2024-09-28T03:57", "type": "expense", "category": "Others", "transactionAmount": 35, "title": "Rented movie"}, {"time": "2024-09-30T03:57", "type": "income", "category": "Others", "transactionAmount": 120, "title": "Salary"}]\nOutput: Done! I have updated 2 entries to your account.\n\n**Income**: 30th September 2024: Salary, 120$\n\n**Income**\n\n28th September 2024: Rented movie, 120$.\n\nNOTE: IF an empty array is received, reply "I cannot find any data related to your request :("',
+              },
+              messages: [{ role: 'user', content: 'Array JSON: ' + json_data }],
+            };
+          } else {
+            return res.status(500).json({ error: '/update command failed' });
           }
-        }
-        console.log(`Loop executed ${loopCount} times`);
-        // Assign payload
-        if (json_data) {
-          payload = {
-            settings: {
-              response_length: 'short',
-              temperature: 0.5,
-              system_prompt:
-                'You are a reporter, I will give you an array of JSON of transactions. Before I asked you, there already has been a third parties who took care of the transactions deleting. Your job is to inform me that it has been done."Reply in this format (sort entries by date ascending, do not tell the hour/minute, be sure to add new line after each entries): Done! I have deleted <number> entries in your account.\n\n**Income**: \n\n<date> entries\n\n**Expenses**: \n\n<date> entries.\n\nExample:\nInput: [{""date": "2024-09-28T03:57", "type": "expense", "category": "Others", "transactionAmount": 35, "title": "Rented movie""}, {"time": "2024-09-30T03:57", "type": "income", "category": "Others", "transactionAmount": 120, "title": "Salary"}]\nOutput: Done! I have deleted 2 entries to your account.\n\n**Income**: 30th September 2024: Salary, 120$\n\n**Income**\n\n28th September 2024: Rented movie, 120$.\n\nNOTE: IF an empty array is received, reply "I cannot find any data related to your request :("',
+          break;
+        case '/delete':
+          for (let i = 0; i < 5; i++) {
+            json_data = await gptDeleteTransaction(
+              userId,
+              userMessage,
+              startDate,
+              endDate
+            );
+            loopCount++;
+            if (json_data) {
+              break;
+            }
+          }
+          console.log(`Loop executed ${loopCount} times`);
+          // Assign payload
+          if (json_data) {
+            payload = {
+              settings: {
+                response_length: 'short',
+                temperature: 0.5,
+                system_prompt:
+                  'You are a reporter, I will give you an array of JSON of transactions. Before I asked you, there already has been a third parties who took care of the transactions deleting. Your job is to inform me that it has been done."Reply in this format (sort entries by date ascending, do not tell the hour/minute, be sure to add new line after each entries): Done! I have deleted <number> entries in your account.\n\n**Income**: \n\n<date> entries\n\n**Expenses**: \n\n<date> entries.\n\nExample:\nInput: [{""date": "2024-09-28T03:57", "type": "expense", "category": "Others", "transactionAmount": 35, "title": "Rented movie""}, {"time": "2024-09-30T03:57", "type": "income", "category": "Others", "transactionAmount": 120, "title": "Salary"}]\nOutput: Done! I have deleted 2 entries to your account.\n\n**Income**: 30th September 2024: Salary, 120$\n\n**Income**\n\n28th September 2024: Rented movie, 120$.\n\nNOTE: IF an empty array is received, reply "I cannot find any data related to your request :("',
+              },
+              messages: [{ role: 'user', content: 'Array JSON: ' + json_data }],
+            };
+          } else {
+            return res.status(500).json({ error: '/delete command failed' });
+          }
+          break;
+        default:
+          // Unknown commands
+          // Stream hardcoded response
+          const hardcodedResponse = JSON.stringify({
+            content: {
+              content: 'Unknown command received, please try again',
+              title: 'Unknown command',
             },
-            messages: [{ role: 'user', content: 'Array JSON: ' + json_data }],
-          };
-        } else {
-          return res.status(500).json({ error: '/delete command failed' });
-        }
-      } else {
-        // Unknown commands
-        // Stream hardcoded response
-        const hardcodedResponse = JSON.stringify({
-          content: {
+          });
+
+          res.write(hardcodedResponse);
+          res.end();
+
+          const assistantMessage = {
+            role: 'assistant',
             content: 'Unknown command received, please try again',
-            title: 'Unknown command',
-          },
-        });
+          };
 
-        res.write(hardcodedResponse);
-        res.end();
-
-        const assistantMessage = {
-          role: 'assistant',
-          content: 'Unknown command received, please try again',
-        };
-
-        conversation.messages.push(assistantMessage);
-        return res.status(400).json({ error: 'Unknown command' });
+          conversation.messages.push(assistantMessage);
+          return res.status(400).json({ error: 'Unknown command' });
+          break;
       }
     } else {
       // Get current transactions
@@ -367,7 +377,7 @@ exports.sendMainMessage = async (req, res) => {
           response_length: response_length,
           temperature: temperature,
           system_prompt:
-            "Act as a Financial Assistant, you will give me answers to any questions or requests. There are important notes you should be aware of before answering:\n- The question or requests should only be related to money, investing, mortgage, etc... anything finance-related. Use dollar signs $. If the question/request considerably goes out of these scopes, refuse to reply.\n- Your answer should be in correlation of these things: the current date, the transactions data (in CSV format), and the saving goal's name/amount. You should be aware of them to give a personalized answer, while also quoting your statements to the data given (e.g. Transactions details, etc). Be sure to always check the given data as they will be updated occasionally, keeping the balance between the relevancy of the data and the previous responses.\n" +
+            "Act as a Financial Assistant, you will give me answers to any questions or requests. There are important notes you should be aware of before answering:\n- The question or requests should only be related to money, investing, mortgage, etc... anything finance-related. Use dollar signs $. If the question/request considerably goes out of these scopes, refuse to reply.\n- Your answer should be in correlation of these things: the current date, the transactions data (in CSV format, date is formatted ddmmyy-hhmm), and the saving goal's name/amount. You should be aware of them to give a personalized answer, while also quoting your statements to the data given (e.g. Transactions details, etc). Be sure to always check the given data as they will be updated occasionally, keeping the balance between the relevancy of the data and the previous responses.\n" +
             'The current date is: ' +
             currentDate +
             '\n' +
@@ -387,9 +397,17 @@ exports.sendMainMessage = async (req, res) => {
       }
     );
 
+    // Check if the response status code is different than 200
+    if (response.status !== 200) {
+      return res
+        .status(response.status)
+        .json({ error: 'Error from GPT Service.' });
+    }
+
     // Initialize variables to store the concatenated stream and title
     let concatenatedStream = '';
     let title = '';
+
     response.data.on('data', (chunk) => {
       const chunkString = chunk.toString();
       const chunkJson = JSON.parse(chunkString);
@@ -420,23 +438,37 @@ exports.sendMainMessage = async (req, res) => {
       conversation.messages.push(assistantMessage);
 
       // Update the conversation title if it was fetched
-      if (title) {
+      if (title && !conversation.title) {
         conversation.title = title;
       }
 
-      // Save the conversation
-      await conversation.save();
+      // Save the conversation with error handling
+      try {
+        await conversation.save();
+      } catch (mongooseError) {
+        console.error('Error saving conversation:', "Could be because GPT server failed? Cookies maybe?");
+        // Ensure the response is not sent again if headers are already sent
+        if (!res.headersSent) {
+          res
+            .status(500)
+            .json({ error: 'Error saving conversation to the database.' });
+        }
+      }
     });
 
     response.data.on('error', (error) => {
       console.error('Error in streaming response:', error.message);
-      res
-        .status(500)
-        .json({ error: 'Error in streaming response from GPT Service.' });
+      if (!res.headersSent) {
+        res
+          .status(500)
+          .json({ error: 'Error in streaming response from GPT Service.' });
+      }
     });
   } catch (error) {
     console.error(error.message);
-    res.status(500).json({ error: 'Internal Server error' });
+    if (!res.headersSent) {
+      res.status(500).json({ error: 'Internal Server error' });
+    }
   }
 };
 
