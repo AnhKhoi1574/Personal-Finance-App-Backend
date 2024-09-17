@@ -25,11 +25,4 @@ router.post(
   conversationController.sendMainMessage
 );
 
-// Generate an array of 4 prompts
-router.post(
-  '/getPrompts',
-  authController.protect,
-  conversationController.getSuggestionPrompt
-);
-
 module.exports = router;
