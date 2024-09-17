@@ -210,6 +210,7 @@ exports.sendMainMessage = async (req, res) => {
         },
         createdAt: new Date(),
       });
+      await conversation.save();
     }
 
     // Initialize the payload
@@ -407,6 +408,9 @@ exports.sendMainMessage = async (req, res) => {
     // Initialize variables to store the concatenated stream and title
     let concatenatedStream = '';
     let title = '';
+
+    
+    res.write(JSON.stringify({conversation_id: conversation._id}) + '\n');
 
     response.data.on('data', (chunk) => {
       const chunkString = chunk.toString();
