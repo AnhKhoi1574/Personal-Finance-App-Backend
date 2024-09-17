@@ -14,15 +14,21 @@ exports.createTransaction = async (req, res) => {
   try {
     const userId = req.user._id;
     const { date, type, transactionAmount, category, title } = req.body;
-
-    newTransaction = createTransactionHelper(
-      userId,
-      date,
-      type,
-      transactionAmount,
-      category,
-      title
-    );
+    console.log('hehe');
+    let newTransaction;
+    try {
+      newTransaction = await createTransactionHelper(
+        userId,
+        date,
+        type,
+        transactionAmount,
+        category,
+        title
+      );
+    } catch (error) {
+      console.error('Error creating transaction:', error);
+      return res.status(400).json({ error: error.message });
+    }
     // Respond with the newly created transaction
     res.status(201).json({
       status: 'success',
@@ -165,15 +171,21 @@ exports.updateTransaction = async (req, res) => {
     const transactionId = req.params.transactionId;
     const { date, type, category, transactionAmount, title } = req.body;
 
-    const updatedTransaction = await updateTransactionHelper(
-      userId,
-      transactionId,
-      date,
-      type,
-      category,
-      transactionAmount,
-      title
-    );
+    let updatedTransaction;
+    try {
+      updatedTransaction = await updateTransactionHelper(
+        userId,
+        transactionId,
+        date,
+        type,
+        category,
+        transactionAmount,
+        title
+      );
+    } catch (error) {
+      console.error('Error updating transaction:', error);
+      return res.status(400).json({ error: error.message });
+    }
 
     // Send a success response with the updated transaction data
     res.status(200).json({
@@ -196,11 +208,13 @@ exports.deleteTransaction = async (req, res) => {
     const userId = req.user._id;
     const transactionId = req.params.transactionId;
 
-    const deletedTransaction = await deleteTransactionHelper(
-      userId,
-      transactionId
-    );
-
+    let deletedTransaction;
+    try {
+      deletedTransaction = await deleteTransactionHelper(userId, transactionId);
+    } catch (error) {
+      console.error('Error deleting transaction:', error);
+      return res.status(400).json({ error: error.message });
+    }
     // Send a success response
     res.status(200).json({
       status: 'success',
