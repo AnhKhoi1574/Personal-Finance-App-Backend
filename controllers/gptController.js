@@ -229,7 +229,7 @@ exports.sendMainMessage = async (req, res) => {
       const command = lastMessage.content.split(' ')[0];
       switch (command) {
         case '/create':
-          for (let i = 0; i < 5; i++) {
+          for (let i = 0; i < 3; i++) {
             json_data = await gptAddTransaction(userId, userMessage);
             loopCount++;
             if (json_data) {
@@ -253,7 +253,7 @@ exports.sendMainMessage = async (req, res) => {
           }
           break;
         case '/update':
-          for (let i = 0; i < 5; i++) {
+          for (let i = 0; i < 3; i++) {
             json_data = await gptUpdateTransaction(
               userId,
               userMessage,
@@ -285,7 +285,7 @@ exports.sendMainMessage = async (req, res) => {
           }
           break;
         case '/delete':
-          for (let i = 0; i < 5; i++) {
+          for (let i = 0; i < 3; i++) {
             json_data = await gptDeleteTransaction(
               userId,
               userMessage,
