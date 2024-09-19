@@ -14,7 +14,6 @@ exports.createTransaction = async (req, res) => {
   try {
     const userId = req.user._id;
     const { date, type, transactionAmount, category, title } = req.body;
-    console.log('hehe');
     let newTransaction;
     try {
       newTransaction = await createTransactionHelper(

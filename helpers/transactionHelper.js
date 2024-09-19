@@ -101,7 +101,6 @@ async function updateTransactionHelper(
   title
 ) {
   try {
-    console.log(userId);
     // Find the user by ID
     const user = await User.findById(userId);
     if (!user) {
