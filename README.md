@@ -32,7 +32,7 @@ npm install
 
 - Run test: `npm run test-measure <number of iterations>`
 
-Example: Test for 10 iterations
+Example: test for 10 iterations
 ```bash
 npm run test-measure 10
 ```
