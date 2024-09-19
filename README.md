@@ -25,17 +25,13 @@ node server.js
 ## Testing
 Integration Test for AI Chatbot commands, **REQUIRES** [revChatVal](https://github.com/Khang5687/revChatVal/tree/fastapi) to be running on port `8000`.
 
-- Install dependencies:
-```bash
-npm install
-```
+Install dependencies: `npm install`
 
-- Run test: `npm run test-measure <number of iterations>`
+- Run test: `npm run test`
 
-Example: test for 10 iterations
-```bash
-npm run test-measure 10
-```
+- Measure time and accuracy: `npm run test-measure <number of iterations>`
+
+    Example: test for 10 iterations -> `npm run test-measure 10`
 
 
 ## License
