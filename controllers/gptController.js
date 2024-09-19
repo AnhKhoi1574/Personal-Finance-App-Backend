@@ -236,7 +236,7 @@ exports.sendMainMessage = async (req, res) => {
               break;
             }
           }
-          console.log(`Loop executed ${loopCount} times`);
+          // console.log(`Loop executed ${loopCount} times`);
           // Assign payload
           if (json_data) {
             payload = {
@@ -265,7 +265,7 @@ exports.sendMainMessage = async (req, res) => {
               break;
             }
           }
-          console.log(`Loop executed ${loopCount} times`);
+          // console.log(`Loop executed ${loopCount} times`);
           if (json_data === false) {
             return res.status(500).json({ error: '/update command failed' });
           }
@@ -297,7 +297,7 @@ exports.sendMainMessage = async (req, res) => {
               break;
             }
           }
-          console.log(`Loop executed ${loopCount} times`);
+          // console.log(`Loop executed ${loopCount} times`);
           // Assign payload
           if (json_data) {
             payload = {
